@@ -5,3 +5,24 @@
 html, body, #root {
   height: 100%;
 }
+
+/* xterm.js tweaks */
+.xterm {
+  font-variant-ligatures: none;
+}
+
+/* Full-bleed terminal without inner padding */
+.xterm .xterm-rows { padding: 0; }
+
+/* Subtle custom scrollbar */
+.xterm .xterm-viewport::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.xterm .xterm-viewport::-webkit-scrollbar-thumb {
+  background: #2a2a2a;
+  border-radius: 6px;
+}
+.xterm .xterm-viewport::-webkit-scrollbar-track {
+  background: transparent;
+}

@@ -13,42 +13,93 @@ export default function App() {
   useEffect(() => {
     const term = new Terminal({
       cursorBlink: true,
+      convertEol: true,
+      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace',
+      fontSize: 14,
+      lineHeight: 1.2,
+      letterSpacing: 0,
+      // No scrollback so the terminal never shows an internal scrollbar
+      scrollback: 0,
       theme: {
-        background: '#000000',
-        foreground: '#E6E6E6',
+        background: '#0a0a0a',
+        foreground: '#e5e7eb',
+        cursor: '#93c5fd',
+        selectionBackground: '#3b82f680',
       },
     })
     const fitAddon = new FitAddon()
     term.loadAddon(fitAddon)
     termRef.current = term
 
-    if (containerRef.current) {
-      term.open(containerRef.current)
-      fitAddon.fit()
-      window.addEventListener('resize', () => fitAddon.fit())
+    const container = containerRef.current
+    let raf: number | undefined
+    const fitSafe = () => {
+      try { fitAddon.fit() } catch { /* xterm may throw if not yet opened */ }
+    }
+    const onResize = () => {
+      if (raf) cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(fitSafe)
+    }
+    if (container) {
+      term.open(container)
+      raf = requestAnimationFrame(fitSafe)
+      window.addEventListener('resize', onResize)
     }
 
-    term.writeln('Welcome to your AI Portfolio Terminal!')
+    term.writeln('Welcome to Yubi Terminal!')
     term.writeln('Type your prompt and press Enter.\r\n')
 
-    const ws = new WebSocket(WS_URL)
+  const ws = new WebSocket(WS_URL)
     ws.addEventListener('open', () => {
-      term.writeln('[connected]')
+      term.writeln('[CONNECTED]')
     })
     ws.addEventListener('close', () => {
-      term.writeln('[disconnected]')
+      term.writeln('[DISCONNECTED]')
     })
+    ws.addEventListener('error', () => {
+      term.writeln('[ERROR] websocket connection error')
+    })
+    let lineBuffer = ''
+    const normalizeLine = (s: string) => s.replace(/^\s{3,}/, '  ')
+
     ws.addEventListener('message', (event) => {
       const data = JSON.parse(event.data)
       if (data.type === 'token') {
-        term.write(data.content)
+        lineBuffer += data.content
+        // Flush complete lines to avoid massive left padding
+        const parts = lineBuffer.split(/\r?\n/)
+        for (let i = 0; i < parts.length - 1; i++) {
+          term.writeln(normalizeLine(parts[i]))
+        }
+        lineBuffer = parts[parts.length - 1]
       } else if (data.type === 'line') {
-        term.writeln(data.content)
+        term.writeln(normalizeLine(String(data.content ?? '')))
       } else if (data.type === 'ready') {
-        term.writeln('> ready')
+        term.writeln('[READY]')
+        term.writeln('[HINT] type /reset to start a fresh session')
+        term.write('> ')
+      } else if (data.type === 'status') {
+        if ((data.message || '').toLowerCase() === 'done') {
+          // Flush any remaining buffered text and show a fresh prompt
+          if (lineBuffer && lineBuffer.length > 0) {
+            term.writeln(normalizeLine(lineBuffer))
+            lineBuffer = ''
+          }
+          const lvl = data.level?.toUpperCase?.() ?? 'INFO'
+          term.writeln(`[${lvl}] ${data.message}`)
+          term.write('> ')
+        } else if ((data.message || '').toLowerCase() === 'session reset') {
+          term.writeln('[INFO] session reset')
+          term.write('> ')
+        } else {
+          const lvl = data.level?.toUpperCase?.() ?? 'INFO'
+          term.writeln(`[${lvl}] ${data.message}`)
+        }
+      } else if (data.type === 'error') {
+        term.writeln(`[ERROR] ${data.message}`)
       }
     })
-    setSocket(ws)
+  setSocket(ws)
 
     let current = ''
     term.onData((d) => {
@@ -56,7 +107,11 @@ export default function App() {
         const trimmed = current.trim()
         term.write('\r\n')
         if (trimmed.length > 0) {
-          ws.send(JSON.stringify({ type: 'prompt', content: trimmed }))
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'prompt', content: trimmed }))
+          } else {
+            term.writeln('[WARN] connection not open')
+          }
         }
         current = ''
       } else if (d === '\u007F') { // backspace
@@ -70,14 +125,17 @@ export default function App() {
       }
     })
 
+    // Cleanup
     return () => {
-      ws.close()
-      term.dispose()
+      try { window.removeEventListener('resize', onResize) } catch {}
+      try { if (raf) cancelAnimationFrame(raf) } catch {}
+      try { ws.close() } catch {}
+      try { term.dispose() } catch {}
     }
   }, [])
 
   return (
-    <div className="h-screen w-screen bg-black text-white p-4">
+    <div className="h-screen w-screen overflow-hidden bg-neutral-950 text-neutral-200">
       <div ref={containerRef} className="h-full w-full" />
     </div>
   )
