@@ -4,6 +4,7 @@ node_modules/
 # Builds
 client/dist/
 server/dist/
+*.tsbuildinfo
 
 # Logs
 npm-debug.log*
