@@ -14,3 +14,6 @@ export interface AgentInput {
 export interface Agent {
   handle(input: AgentInput): AsyncGenerator<AgentEvent, void, void>
 }
+
+// Export the AgentCore Runtime agent for connecting to our GitHub MCP server
+export { BedrockAgentRuntime } from './bedrockAgentRuntime.js';

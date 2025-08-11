@@ -49,6 +49,16 @@ export default function App() {
     term.writeln('Welcome to Yubi Terminal!')
     term.writeln('Type your prompt and press Enter.\r\n')
 
+    // Block navigation keys so the cursor can't move away from the prompt line
+    term.attachCustomKeyEventHandler((e) => {
+      const blockedKeys = new Set([
+        'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+        'Home', 'End', 'PageUp', 'PageDown'
+      ])
+      if (blockedKeys.has(e.key)) return false
+      return true
+    })
+
   const ws = new WebSocket(WS_URL)
     ws.addEventListener('open', () => {
       term.writeln('[CONNECTED]')
@@ -103,6 +113,11 @@ export default function App() {
 
     let current = ''
     term.onData((d) => {
+      // Ignore ESC-based control sequences (arrows, etc.)
+      if (d && d.charCodeAt(0) === 27) {
+        return
+      }
+
       if (d === '\r') {
         const trimmed = current.trim()
         term.write('\r\n')
@@ -112,16 +127,33 @@ export default function App() {
           } else {
             term.writeln('[WARN] connection not open')
           }
+        } else {
+          // Empty enter: show a fresh prompt immediately
+          term.write('> ')
         }
         current = ''
+        // Reprint prompt handled by server via status "done"/"session reset"
+      } else if (d === '\u0003') { // Ctrl+C
+        // Cancel current input and show a fresh prompt line
+        current = ''
+        term.write('^C\r\n> ')
       } else if (d === '\u007F') { // backspace
         if (current.length > 0) {
           current = current.slice(0, -1)
           term.write('\b \b')
         }
       } else {
-        current += d
-        term.write(d)
+        // Only echo printable characters (basic ASCII range)
+        // Sanitize the entire chunk to avoid embedded control codes/newlines in pastes
+        if (d.includes('\u001b')) return // drop anything with ESC
+        const sanitized = d
+          .replace(/\r|\n/g, '') // drop newlines
+          .replace(/\t/g, '  ')   // turn tabs into two spaces
+          .replace(/[^\x20-\x7E]+/g, '') // keep printable ASCII only
+        if (sanitized.length > 0) {
+          current += sanitized
+          term.write(sanitized)
+        }
       }
     })
 
