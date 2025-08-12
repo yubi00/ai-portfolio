@@ -10,12 +10,11 @@ import { Octokit } from "octokit";
 // Initialize GitHub client
 const githubToken = process.env.GITHUB_TOKEN;
 if (!githubToken) {
-  console.error("❌ GITHUB_TOKEN environment variable is not set!");
-  console.error("Please check your .env file contains GITHUB_TOKEN=your_token_here");
+  // Error messages removed to avoid non-JSON output on stdio
   process.exit(1);
 }
 
-console.log("✅ GitHub token loaded successfully:", githubToken.substring(0, 20) + "...");
+// Removed log to avoid non-JSON output on stdio
 
 const octokit = new Octokit({
   auth: githubToken
@@ -253,11 +252,11 @@ if (process.env.NODE_ENV === 'production' || process.env.AGENTCORE === 'true') {
       stateless: true  // Required for AgentCore Runtime
     }
   });
-  console.log("🚀 GitHub MCP Server running in AgentCore Runtime mode on port 8000");
+  // Removed log to avoid non-JSON output on stdio
 } else {
   // Development mode - stdio for testing
   server.start({
     transportType: "stdio"
   });
-  console.log("🚀 GitHub MCP Server running in development mode (stdio)");
+  // Removed log to avoid non-JSON output on stdio
 }
