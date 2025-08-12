@@ -2,6 +2,8 @@ import express, { Request, Response } from 'express'
 import cors from 'cors'
 import { config } from './config.js'
 import { logger } from './utils/logger.js'
+import { agentCoreClient } from './agentcore.js';
+import { ListAgentsCommand } from '@aws-sdk/client-bedrock-agentcore';
 
 const app = express()
 app.use(cors())
@@ -24,6 +26,18 @@ app.get('/info', (_req: Request, res: Response) => {
     githubMcpServer: 'Ready for AgentCore Runtime integration',
     port: config.port
   })
+})
+
+// Example route to list Bedrock agents
+app.get('/agentcore/agents', async (_req: Request, res: Response) => {
+  try {
+    const command = new ListAgentsCommand({});
+    const response = await agentCoreClient.send(command);
+    res.json({ ok: true, agents: response });
+  } catch (error) {
+    logger.error('Error calling Bedrock AgentCore:', error);
+    res.status(500).json({ ok: false, error: (error as Error).message });
+  }
 })
 
 // Start server
