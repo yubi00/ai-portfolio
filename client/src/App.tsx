@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { Terminal } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
 import 'xterm/css/xterm.css'
+import './terminal-custom.css'
 
 export default function App() {
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -11,14 +12,14 @@ export default function App() {
     const term = new Terminal({
       cursorBlink: true,
       convertEol: true,
-      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace',
-      fontSize: 14,
-      lineHeight: 1.2,
+      fontFamily: 'JetBrains Mono, Fira Mono, Roboto Mono, ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace',
+      fontSize: 20,
+      lineHeight: 1.3,
       letterSpacing: 0,
       scrollback: 1000,
       theme: {
-        background: '#0a0a0a',
-        foreground: '#e5e7eb',
+        background: '#101014',
+        foreground: '#b0b3b8',
         cursor: '#93c5fd',
         selectionBackground: '#3b82f680',
       },
@@ -41,11 +42,13 @@ export default function App() {
       raf = requestAnimationFrame(fitSafe)
       window.addEventListener('resize', onResize)
     }
-
-    term.writeln('Welcome to Yubi Terminal!')
-    term.writeln('Simple AI Portfolio Terminal')
-    term.writeln('Type your commands and press Enter.\r\n')
-    term.write('> ')
+    
+  // Use xterm.js escape for bold and color, but font-size must be set via CSS on the container
+  term.writeln('\x1b]1337;SetMark;\x07') // iTerm2 mark for visual separation (optional)
+  term.writeln('');
+  term.writeln('\x1b[1m\x1b[38;5;81mWelcome to Yubi Portfolio Terminal!\x1b[0m');
+  term.writeln('\x1b[1mType your commands and press Enter.\x1b[0m\r\n');
+  term.write('\x1b[1m> \x1b[0m');
 
     // Handle user input
     let current = ''
@@ -64,7 +67,13 @@ export default function App() {
           handleCommand(trimmed, term)
         } else {
           // Empty enter: show a fresh prompt immediately
-          term.write('> ')
+          // Draw a rectangular border for the prompt
+          const promptWidth = term.cols - 2;
+          const pad = Math.max(0, promptWidth - 2); // '> '.length = 2
+          const top = '┌' + '─'.repeat(promptWidth) + '┐';
+          const mid = '│> ' + ' '.repeat(pad) + '│';
+          const bot = '└' + '─'.repeat(promptWidth) + '┘';
+          term.write('\x1b[1m> \x1b[0m');
         }
         current = ''
       } else if (d === '\u0003') { // Ctrl+C
@@ -99,48 +108,69 @@ export default function App() {
   }, [])
 
   // Simple command handler for demonstration
-  const handleCommand = (command: string, term: Terminal) => {
-    const cmd = command.toLowerCase().trim()
-    
+  const handleCommand = async (command: string, term: Terminal) => {
+    const cmd = command.toLowerCase().trim();
+    // Known local commands
     switch (cmd) {
       case 'help':
-        term.writeln('Available commands:')
-        term.writeln('  help    - Show this help message')
-        term.writeln('  clear   - Clear the terminal')
-        term.writeln('  info    - Show server info')
-        term.writeln('  ping    - Test server connection')
-        break
-      
+        term.writeln('Available commands:');
+        term.writeln('  help    - Show this help message');
+        term.writeln('  clear   - Clear the terminal');
+        term.writeln('  info    - Show server info');
+        term.writeln('  ping    - Test server connection');
+        term.writeln('  You can also just ask: "What projects have you worked on?"');
+        break;
       case 'clear':
-        term.clear()
-        term.writeln('Welcome to Yubi Terminal!')
-        term.writeln('Simple AI Portfolio Terminal')
-        term.writeln('Type your commands and press Enter.\r\n')
-        break
-      
+        term.clear();
+        term.writeln('Welcome to Yubi Terminal!');
+        term.writeln('Simple AI Portfolio Terminal');
+        term.writeln('Type your commands and press Enter.\r\n');
+        break;
       case 'info':
-        // This could later make an HTTP call to /info endpoint
-        term.writeln('AI Portfolio Terminal v0.1.0')
-        term.writeln('Ready for AI integration')
-        break
-      
+        term.writeln('AI Portfolio Terminal v0.1.0');
+        term.writeln('Ready for AI integration');
+        break;
       case 'ping':
-        // This could later make an HTTP call to /health endpoint
-        term.writeln('Server: Ready (local mode)')
-        break
-      
+        term.writeln('Server: Ready (local mode)');
+        break;
       default:
-        term.writeln(`Unknown command: ${command}`)
-        term.writeln('Type "help" for available commands')
-        break
+        // Treat as chat: send to MCP client endpoint
+        term.writeln('Assistant: Let me check your projects...');
+        try {
+          const res = await fetch('http://127.0.0.1:9000/prompt', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: 'list_repositories', arguments: {} })
+          });
+          if (!res.ok) {
+            term.writeln('Error: Failed to fetch from MCP client.');
+          } else {
+            const data = await res.json();
+            // Try to pretty print the repo list
+            const repos = data.result || data; // fallback for direct result
+            if (Array.isArray(repos)) {
+              term.writeln(`Found ${repos.length} repositories:`);
+              repos.forEach((repo: any, i: number) => {
+                term.writeln(`${i + 1}. ${repo.name} (${repo.language || 'n/a'}) - ${repo.description || ''}`);
+              });
+            } else if (repos && typeof repos === 'object') {
+              // Try to print as JSON
+              term.writeln(JSON.stringify(repos, null, 2));
+            } else {
+              term.writeln('No repositories found or unexpected response.');
+            }
+          }
+        } catch (err) {
+          term.writeln('Error: Could not reach MCP client.');
+        }
+        break;
     }
-    
-    term.write('> ')
+    term.write('> ');
   }
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-neutral-950 text-neutral-200">
-      <div ref={containerRef} className="h-full w-full" />
+    <div className="h-screen w-screen overflow-hidden bg-neutral-950 text-neutral-200 flex flex-col justify-center p-8">
+      <div ref={containerRef} className="h-full w-full rounded-lg shadow-lg p-6" style={{background: '#101014', border: '1.5px solid #23232a', minHeight: '80vh'}} />
     </div>
   )
 }

@@ -2,11 +2,21 @@
 import os
 import uuid
 import requests
+import sseclient
 from fastapi import FastAPI, Body, HTTPException
 from fastapi.concurrency import run_in_threadpool
 import uvicorn
+from fastapi.middleware.cors import CORSMiddleware
+
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Point this at the HTTP endpoint your MCP server actually handles.
 # You said /mcp works for you.
@@ -23,12 +33,20 @@ _initialized = False
 
 
 def _rpc(payload: dict, timeout: int = 60) -> dict:
-    """Send a JSON-RPC call to the MCP server."""
+    """Send a JSON-RPC call to the MCP server (SSE stream)."""
     payload.setdefault("jsonrpc", "2.0")
     payload.setdefault("id", str(uuid.uuid4()))
-    r = _session.post(MCP_SERVER_URL, json=payload, timeout=timeout)
+    r = _session.post(MCP_SERVER_URL, json=payload, timeout=timeout, stream=True)
     r.raise_for_status()
-    data = r.json()
+    client = sseclient.SSEClient(r)
+    last_data = None
+    for event in client.events():
+        if event.event == "message" and event.data:
+            last_data = event.data
+    if last_data is None:
+        raise HTTPException(status_code=502, detail="No data received from MCP server.")
+    print("Raw SSE data from MCP server:", last_data)  # Debug print
+    data = requests.models.complexjson.loads(last_data)
     if "error" in data:
         raise HTTPException(status_code=502, detail=data["error"])
     return data

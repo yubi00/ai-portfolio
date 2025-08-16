@@ -1,0 +1,29 @@
+/* Banner for ASCII art */
+.terminal-banner {
+  font-family: 'JetBrains Mono', 'Fira Mono', 'Roboto Mono', monospace;
+  font-size: 10px;
+  color: #b0b3b8;
+  text-align: center;
+  white-space: pre;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Fira+Mono:wght@400;500;700&family=Roboto+Mono:wght@400;500;700&display=swap');
+
+.xterm {
+  font-family: 'JetBrains Mono', 'Fira Mono', 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace !important;
+  font-size: 16px !important;
+  background: #101014 !important;
+  color: #b0b3b8 !important;    
+  padding: 24px 32px 32px 32px !important;
+  border-radius: 12px;
+  box-shadow: 0 2px 16px 0 #00000044;
+}
+.xterm .xterm-viewport::-webkit-scrollbar-thumb {
+  background: #23232a;
+}
+.user-input-box {
+  border-width: 2px;
+  border-style: solid;
+  box-shadow: 0 1px 6px 0 #00000022;
+}
