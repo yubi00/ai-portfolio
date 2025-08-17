@@ -135,33 +135,30 @@ export default function App() {
         break;
       default:
         // Treat as chat: send to MCP client endpoint
-        term.writeln('Assistant: Let me check your projects...');
         try {
           const res = await fetch('http://127.0.0.1:9000/prompt', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: 'list_repositories', arguments: {} })
+            body: JSON.stringify({ prompt: command })
           });
           if (!res.ok) {
-            term.writeln('Error: Failed to fetch from MCP client.');
+            term.writeln('\x1b[31mError: Failed to fetch from MCP client.\x1b[0m');
           } else {
             const data = await res.json();
-            // Try to pretty print the repo list
-            const repos = data.result || data; // fallback for direct result
-            if (Array.isArray(repos)) {
-              term.writeln(`Found ${repos.length} repositories:`);
-              repos.forEach((repo: any, i: number) => {
-                term.writeln(`${i + 1}. ${repo.name} (${repo.language || 'n/a'}) - ${repo.description || ''}`);
-              });
-            } else if (repos && typeof repos === 'object') {
-              // Try to print as JSON
-              term.writeln(JSON.stringify(repos, null, 2));
+            let answer = '';
+            if (typeof data.result === 'string') {
+              answer = data.result;
+            } else if (typeof data === 'string') {
+              answer = data;
             } else {
-              term.writeln('No repositories found or unexpected response.');
+              answer = JSON.stringify(data, null, 2);
             }
+            // Add a colored prefix and extra spacing for clarity
+            term.writeln('\r\n\x1b[1m\x1b[38;5;81mYubi Assistant:\x1b[0m');
+            term.writeln(`\x1b[38;5;250m${answer}\x1b[0m\r\n`);
           }
         } catch (err) {
-          term.writeln('Error: Could not reach MCP client.');
+          term.writeln('\x1b[31mError: Could not reach MCP client.\x1b[0m');
         }
         break;
     }
@@ -169,7 +166,7 @@ export default function App() {
   }
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-neutral-950 text-neutral-200 flex flex-col justify-center p-8">
+    <div className="h-screen w-screen overflow-hidden text-neutral-200 flex flex-col justify-center p-0" style={{background: 'transparent', boxShadow: 'none', border: 'none'}}>
       <div ref={containerRef} className="h-full w-full rounded-lg shadow-lg p-6" style={{background: '#101014', border: '1.5px solid #23232a', minHeight: '80vh'}} />
     </div>
   )
