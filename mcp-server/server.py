@@ -19,7 +19,6 @@ def _err_msg(e: GithubException) -> str:
 # -----------------------------
 load_dotenv()
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
-print(f"GITHUB_TOKEN: {GITHUB_TOKEN}")
 if not GITHUB_TOKEN:
     # Avoid noisy output on stdio (matches your TS version’s behavior)
     raise SystemExit(1)
