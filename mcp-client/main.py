@@ -40,21 +40,21 @@ def summarize(prompt: str) -> str:
         return "Please ask about Yubi's personal projects, skills, or GitHub tools."
     # Guardrails: instruct LLM to only answer about Yubi's projects/skills
     system_prompt = (
-        "You are Yubi's AI portfolio assistant. You should answer questions about Yubi's personal projects, skills, or GitHub tools. "
+        "You are Yubi's AI portfolio assistant. You should answer questions about Yubi's personal projects, skills, or any GitHub projects or repositories . "
         "If the user greets you (e.g., says hello, hi, how are you), respond warmly and introduce yourself as Yubi's assistant. "
         "If the user asks about anything unrelated (like weather, news, etc.), kindly reply: 'Sorry, I can only answer questions about Yubi's projects, skills, or experiences.'"
     )
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[
+    response = client.responses.create(
+        model="gpt-4o-mini",
+        input=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt}
         ],
-        max_tokens=256,
+        max_output_tokens=256,
         temperature=0.2,
     )
-    print("OpenAI response:", response.choices[0].message.content.strip())  # Debug print
-    return response.choices[0].message.content.strip()
+    print("OpenAI response:", response.output_text.strip())  # Debug print
+    return response.output_text.strip()
 
 
 def _rpc(payload: dict, timeout: int = 60) -> dict:
