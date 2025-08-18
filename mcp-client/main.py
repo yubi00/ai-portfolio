@@ -2,7 +2,6 @@ from openai import OpenAI
 import os
 import uuid
 import requests
-import sseclient
 from fastapi import FastAPI, Body, HTTPException
 from fastapi.concurrency import run_in_threadpool
 import uvicorn
@@ -58,20 +57,13 @@ def summarize(prompt: str) -> str:
 
 
 def _rpc(payload: dict, timeout: int = 60) -> dict:
-    """Send a JSON-RPC call to the MCP server (SSE stream)."""
+    """Send a JSON-RPC call to the MCP server (HTTP)."""
     payload.setdefault("jsonrpc", "2.0")
     payload.setdefault("id", str(uuid.uuid4()))
-    r = _session.post(MCP_SERVER_URL, json=payload, timeout=timeout, stream=True)
+    r = _session.post(MCP_SERVER_URL, json=payload, timeout=timeout)
     r.raise_for_status()
-    client = sseclient.SSEClient(r)
-    last_data = None
-    for event in client.events():
-        if event.event == "message" and event.data:
-            last_data = event.data
-    if last_data is None:
-        raise HTTPException(status_code=502, detail="No data received from MCP server.")
-    print("Raw SSE data from MCP server:", last_data)  # Debug print
-    data = requests.models.complexjson.loads(last_data)
+    data = r.json()
+    print("Raw HTTP data from MCP server:", data)  # Debug print
     if "error" in data:
         raise HTTPException(status_code=502, detail=data["error"])
     return data
@@ -109,11 +101,13 @@ async def handle_prompt(payload: dict = Body(...)):
     def send_request():
         # Passthrough full JSON-RPC if provided (already a valid MCP call)
         if "method" in payload:
+            print("Received JSON-RPC method:", payload["method"])
             _ensure_initialized()
             return _rpc(payload)
 
         # Direct tool call shape
         if "name" in payload:
+            print("Received tool name:", payload["name"])
             _ensure_initialized()
             return _rpc({
                 "method": "tools/call",
@@ -126,6 +120,7 @@ async def handle_prompt(payload: dict = Body(...)):
         # Free-text prompt: call OpenAI if present, else reply kindly
         if "prompt" in payload:
             prompt = payload["prompt"]
+            print("Received prompt:", prompt)
             return {"result": summarize(prompt)}
 
         # No valid input

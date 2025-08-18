@@ -1,0 +1,9 @@
+mcp==1.13.0
+PyGithub==2.7.0
+python-dotenv==1.1.1
+uvicorn==0.35.0
+fastapi==0.116.1
+openai==1.99.9
+python-dotenv==1.1.1
+requests==2.32.4
+uvicorn==0.35.0
