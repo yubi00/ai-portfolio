@@ -1,15 +1,5 @@
 
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Fira+Mono:wght@400;500;700&family=Roboto+Mono:wght@400;500;700&display=swap');
-/* Banner for ASCII art */
-.terminal-banner {
-  font-family: 'JetBrains Mono', 'Fira Mono', 'Roboto Mono', monospace;
-  font-size: 24px;
-  color: #b0b3b8;
-  text-align: center;
-  white-space: pre;
-  letter-spacing: 1px;
-  margin-bottom: 8px;
-}
 
 /* Ensure xterm fits and wraps inside the container, no horizontal scroll */
 /* xterm.js terminal: force all text to wrap, even long words */
@@ -22,7 +12,7 @@
   width: 100% !important;
   height: 100% !important;
   overflow-x: hidden !important; /* ok to keep */
-  overflow-y: visible !important;
+  overflow-y: hidden !important;
 }
 
 /* Outer container for terminal, for scroll and padding */
