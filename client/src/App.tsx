@@ -8,26 +8,8 @@ import { useEffect, useRef } from 'react'
     const containerRef = useRef<HTMLDivElement | null>(null)
     const termRef = useRef<Terminal | null>(null)
 
-    useEffect(() => {
-  // ASCII art banner (DOH font, static)
-  const banner =  
-  '    YYYYYYY       YYYYYYYUUUUUUUU     UUUUUUUUBBBBBBBBBBBBBBBBB   IIIIIIIIII  \n'+                                                                                                                 
-  '  Y:::::Y       Y:::::YU::::::U     U::::::UB::::::::::::::::B  I::::::::I    \n'+                                                                                                               
-  '  Y:::::Y       Y:::::YU::::::U     U::::::UB::::::BBBBBB:::::B I::::::::I    \n'+                                                                                                               
-  '  Y::::::Y     Y::::::YUU:::::U     U:::::UUBB:::::B     B:::::BII::::::II    \n'+                                                                                                               
-  '  YYY:::::Y   Y:::::YYY U:::::U     U:::::U   B::::B     B:::::B  I::::I      \n'+                                                                                                               
-  '    Y:::::Y Y:::::Y    U:::::D     D:::::U   B::::B     B:::::B  I::::I       \n'+                                                                                                              
-  '      Y:::::Y:::::Y     U:::::D     D:::::U   B::::BBBBBB:::::B   I::::I      \n'+                                                                                                               
-  '      Y:::::::::Y      U:::::D     D:::::U   B:::::::::::::BB    I::::I       \n'+                                                                                                              
-  '        Y:::::::Y       U:::::D     D:::::U   B::::BBBBBB:::::B   I::::I      \n'+                                                                                                               
-  '        Y:::::Y        U:::::D     D:::::U   B::::B     B:::::B  I::::I       \n'+                                                                                                              
-  '        Y:::::Y        U:::::D     D:::::U   B::::B     B:::::B  I::::I       \n'+                                                                                                              
-  '        Y:::::Y        U::::::U   U::::::U   B::::B     B:::::B  I::::I       \n'+                                                                                                              
-  '        Y:::::Y        U:::::::UUU:::::::U BB:::::BBBBBB::::::BII::::::II     \n'+                                                                                                              
-  '      YYYY:::::YYYY      UU:::::::::::::UU  B:::::::::::::::::B I::::::::I    \n'+                                                                                                               
-  '      Y:::::::::::Y        UU:::::::::UU    B::::::::::::::::B  I::::::::I    \n'+                                                                                                               
-  '      YYYYYYYYYYYYY          UUUUUUUUU      BBBBBBBBBBBBBBBBB   IIIIIIIIII    '                                                                                                               
-  
+    useEffect(() => {                                                                          
+
       const term = new Terminal({
         cursorBlink: true,
         convertEol: true,
@@ -66,7 +48,7 @@ import { useEffect, useRef } from 'react'
     term.writeln('\x1b]1337;SetMark;\x07') // iTerm2 mark for visual separation (optional)
     term.writeln('');
     // Change banner color to light grey (ANSI 250)
-    term.writeln('\x1b[1m\x1b[38;5;250m' + banner + '\x1b[0m')
+    // term.writeln('\x1b[1m\x1b[38;5;250m' + banner + '\x1b[0m')
     term.writeln('\x1b[1m\x1b[38;5;81mWelcome to Yubi Portfolio Terminal!\x1b[0m');
     term.writeln('\x1b[1mAsk me anything about my projects, skills and experiences and press Enter.\x1b[0m\r\n');
     term.write('\x1b[1m> \x1b[0m');
@@ -98,7 +80,7 @@ import { useEffect, useRef } from 'react'
           }
           current = ''
         } else if (d === '\u0003') { // Ctrl+C
-    term.writeln('\x1b[1m\x1b[38;5;81m' + banner + '\x1b[0m')
+    // term.writeln('\x1b[1m\x1b[38;5;81m' + banner + '\x1b[0m')
           // Cancel current input and show a fresh prompt line
           current = ''
           term.write('^C\r\n> ')
@@ -187,24 +169,35 @@ import { useEffect, useRef } from 'react'
     }
 
     return (
-      <div className="min-h-screen flex flex-col p-0 text-neutral-200 bg-transparent" style={{ boxShadow: 'none', border: 'none', overflow: 'hidden' }}>
-        <div
-          ref={containerRef}
-          className="terminal-outer-container"
-          style={{
-            width: '100%',
-            minHeight: '80vh',
-            background: '#101014',
-            border: '1.5px solid #23232a',
-            borderRadius: '12px',
-            boxShadow: '0 2px 16px 0 #00000044',
-            padding: '18px 12px 18px 12px',
-            overflowY: 'auto',
-            overflowX: 'hidden',
-            wordBreak: 'break-word',
-            overflowWrap: 'break-word',
+      <div style={{ width: '100%', height: '100vh', background: '#101014', position: 'relative' }}>
+        {/* Overlay banner image inside terminal area */}
+        <img 
+          src="/banner.png" 
+          alt="Banner" 
+          style={{ 
+          position: 'absolute', 
+          top: 0, 
+          left: '10px',      // ✅ small left padding
+          right: '10px',     // ✅ small right padding
+          zIndex: 2, 
+          maxWidth: 'calc(100% - 20px)', // ✅ respect left+right padding
+          height: 'auto',
+          pointerEvents: 'none',
+          marginTop: '10px'
+        }}  
+        />
+        <div 
+          ref={containerRef} 
+          style={{ 
+            width: '100%', 
+            height: '100%', 
             position: 'relative',
-          }}
+            zIndex: 1,
+            paddingTop: '120px', // adjust to match banner height
+            paddingLeft: '10px',   // ✅ add left padding
+            paddingRight: '10px',  // ✅ add right padding
+            boxSizing: 'border-box' // ✅ ensures padding doesn’t shrink terminal area weirdly
+          }} 
         />
       </div>
     )
