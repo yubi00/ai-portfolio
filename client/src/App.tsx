@@ -9,6 +9,7 @@ export default function App() {
   const termRef = useRef<Terminal | null>(null)
   const fitRef = useRef<FitAddon | null>(null)   // keep a handle to FitAddon
   const [showIntroBanner, setShowIntroBanner] = useState(true)
+  const [sessionId, setSessionId] = useState<string | null>(null)
 
   useEffect(() => {
     const term = new Terminal({
@@ -119,11 +120,17 @@ export default function App() {
     switch (cmd) {
       case 'help':
         term.writeln('Available commands:')
-        term.writeln('  help    - Show this help message')
-        term.writeln('  clear   - Clear the terminal')
-        term.writeln('  info    - Show server info')
-        term.writeln('  ping    - Test server connection')
-        term.writeln('  You can also just ask: "What projects have you worked on?"')
+        term.writeln('  help         - Show this help message')
+        term.writeln('  clear        - Clear the terminal')
+        term.writeln('  info         - Show server info')
+        term.writeln('  ping         - Test server connection')
+        term.writeln('  session      - Show current session info')
+        term.writeln('  new-session  - Start a new conversation session')
+        term.writeln('')
+        term.writeln('💬 \x1b[1mConversational Features:\x1b[0m')
+        term.writeln('  First ask: "Tell me your 5 projects"')
+        term.writeln('  Then ask: "Tell me about the third one" ← Context remembered!')
+        term.writeln('  Or ask: "What about the blockchain project?"')
         maybeHideIntroBanner()
         break
 
@@ -147,17 +154,55 @@ export default function App() {
         maybeHideIntroBanner()
         break
 
+      case 'session':
+        if (sessionId) {
+          term.writeln(`\x1b[32m✓ Active session: ${sessionId}\x1b[0m`)
+          term.writeln('\x1b[2m\x1b[90mContext from previous questions is remembered.\x1b[0m')
+        } else {
+          term.writeln('\x1b[33m○ No active session\x1b[0m')
+          term.writeln('\x1b[2m\x1b[90mNext question will start a new session.\x1b[0m')
+        }
+        maybeHideIntroBanner()
+        break
+
+      case 'new-session':
+        if (sessionId) {
+          term.writeln(`\x1b[2m\x1b[90m[Session ${sessionId} ended]\x1b[0m`)
+          setSessionId(null)
+          term.writeln('\x1b[32m✓ Ready for new conversation\x1b[0m')
+        } else {
+          term.writeln('\x1b[33m○ No active session to end\x1b[0m')
+        }
+        maybeHideIntroBanner()
+        break
+
       default:
         try {
+          // Prepare request payload with session management
+          const payload: { prompt: string; session_id?: string } = { prompt: command }
+          if (sessionId) {
+            payload.session_id = sessionId
+          }
+
           const res = await fetch('http://127.0.0.1:9000/prompt', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt: command }),
+            body: JSON.stringify(payload),
           })
           if (!res.ok) {
             term.writeln('\x1b[31mError: Failed to fetch from MCP client.\x1b[0m')
           } else {
             const data = await res.json()
+            
+            // Store session_id returned from backend
+            if (data?.session_id && data.session_id !== sessionId) {
+              setSessionId(data.session_id)
+              if (!sessionId) {
+                // First session created
+                term.writeln(`\x1b[2m\x1b[90m[Session ${data.session_id} started]\x1b[0m`)
+              }
+            }
+
             let answer = ''
             if (typeof data?.result === 'string') answer = data.result
             else if (typeof data === 'string') answer = data
@@ -202,7 +247,28 @@ export default function App() {
       >
         <span style={{ fontWeight: 700, color: '#93c5fd' }}>Yubi Terminal</span>
         <span style={{ opacity: 0.7 }}>v0.1</span>
-        <span style={{ marginLeft: 'auto', opacity: 0.6 }}>[ type <b>help</b> ]</span>
+        {sessionId && (
+          <span style={{ 
+            marginLeft: 'auto', 
+            marginRight: '12px',
+            color: '#10b981', 
+            opacity: 0.8,
+            fontSize: 12,
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 4 
+          }}>
+            <span style={{ 
+              width: 6, 
+              height: 6, 
+              borderRadius: '50%', 
+              background: '#10b981',
+              display: 'inline-block' 
+            }}></span>
+            Session {sessionId}
+          </span>
+        )}
+        <span style={{ marginLeft: sessionId ? 0 : 'auto', opacity: 0.6 }}>[ type <b>help</b> ]</span>
       </div>
 
       {/* Big intro banner */}

@@ -10,6 +10,8 @@ import json
 from typing import Any, Dict, List, Tuple
 from dotenv import load_dotenv
 import logging
+import time
+from datetime import datetime, timedelta
 
 # Configure logging
 def setup_logging():
@@ -39,6 +41,162 @@ def setup_logging():
     return logger
 
 logger = setup_logging()
+
+# Session management
+SESSION_STORE = {}
+SESSION_TIMEOUT = 2 * 60 * 60  # 2 hours for debugging
+
+def cleanup_sessions():
+    """Remove expired sessions"""
+    current_time = time.time()
+    expired_sessions = [
+        session_id for session_id, session_data in SESSION_STORE.items()
+        if current_time - session_data.get('last_access', 0) > SESSION_TIMEOUT
+    ]
+    for session_id in expired_sessions:
+        del SESSION_STORE[session_id]
+        logger.debug(f"Cleaned up expired session: {session_id}")
+
+def get_session_context(session_id: str) -> Dict:
+    """Get session context, creating if needed"""
+    logger.debug(f"DEBUG: Getting session context for {session_id}")
+    cleanup_sessions()
+    
+    if session_id not in SESSION_STORE:
+        SESSION_STORE[session_id] = {
+            'projects': [],  # [{"pos": 1, "name": "...", "key_tech": "..."}]
+            'categories': {},  # {"blockchain": "Ethereum Dapp Boilerplate"}
+            'current_topic': None,
+            'current_project': None,  # Currently discussed project name
+            'last_query': None,
+            'last_access': time.time(),
+            'created': time.time()
+        }
+        logger.debug(f"DEBUG: Created new session: {session_id}")
+        logger.debug(f"DEBUG: Total sessions after create: {len(SESSION_STORE)}")
+    else:
+        SESSION_STORE[session_id]['last_access'] = time.time()
+        logger.debug(f"DEBUG: Found existing session {session_id}, updated access time")
+        logger.debug(f"DEBUG: Session has {len(SESSION_STORE[session_id]['projects'])} projects")
+    
+    return SESSION_STORE[session_id]
+
+def update_session_context(session_id: str, projects: List[Dict], query: str, tool_name: str):
+    """Update session with new context from MCP response"""
+    context = get_session_context(session_id)
+    
+    # Extract project list if this was a list query
+    if tool_name == 'list_repositories' and projects:
+        context['projects'] = []
+        for i, project in enumerate(projects[:10], 1):  # Limit to top 10
+            name = project.get('name', 'Unknown')
+            # Extract key technology from description or language
+            description = project.get('description', '')
+            language = project.get('language', '')
+            key_tech = language or 'General'
+            
+            context['projects'].append({
+                'pos': i,
+                'name': name,
+                'key_tech': key_tech,
+                'url': project.get('html_url', ''),
+                'description': description[:100] + '...' if len(description) > 100 else description
+            })
+        
+        # Update categories for quick lookup
+        context['categories'] = {}
+        for project in context['projects']:
+            tech = project['key_tech'].lower()
+            if 'react' in tech or 'javascript' in tech or 'typescript' in tech:
+                context['categories']['frontend'] = project['name']
+            if 'blockchain' in project['description'].lower() or 'ethereum' in project['description'].lower():
+                context['categories']['blockchain'] = project['name']
+            if 'lambda' in project['name'].lower() or 'serverless' in project['description'].lower():
+                context['categories']['serverless'] = project['name']
+                
+        logger.debug(f"Updated session {session_id} with {len(context['projects'])} projects")
+    
+    # Handle single project queries (get_repository)
+    elif tool_name == 'get_repository':
+        # Extract project name from query 
+        query_lower = query.lower()
+        project_name = None
+        
+        # Look for project name patterns
+        if ' project' in query_lower:
+            # "tell me about kryptovote project" -> "kryptovote"
+            parts = query_lower.split(' project')[0].split()
+            if parts:
+                project_name = parts[-1]  # Last word before "project"
+        elif 'about ' in query_lower:
+            # "tell me about kryptovote" -> "kryptovote" 
+            after_about = query_lower.split('about ', 1)[1].strip()
+            project_name = after_about.split()[0] if after_about.split() else None
+        
+        if project_name:
+            context['current_project'] = project_name
+            logger.debug(f"Set current_project to: {project_name}")
+    
+    context['last_query'] = query
+    context['current_topic'] = tool_name
+
+def resolve_contextual_reference(query: str, context: Dict) -> str:
+    """Resolve contextual references like 'third project', 'blockchain one'"""
+    query_lower = query.lower()
+    projects = context.get('projects', [])
+    
+    # Handle ordinal references
+    ordinal_map = {
+        'first': 1, '1st': 1,
+        'second': 2, '2nd': 2, 
+        'third': 3, '3rd': 3,
+        'fourth': 4, '4th': 4,
+        'fifth': 5, '5th': 5,
+        'last': len(projects),
+        'latest': 1  # Assuming projects are sorted by recent
+    }
+    
+    for ordinal, pos in ordinal_map.items():
+        if ordinal in query_lower and ('project' in query_lower or 'repo' in query_lower or 'one' in query_lower):
+            if pos > 0 and pos <= len(projects) and len(projects) > 0:
+                project = projects[pos - 1]
+                enhanced_query = f"Tell me about {project['name']} project"
+                logger.debug(f"Resolved '{query}' → '{enhanced_query}' using position {pos}")
+                return enhanced_query
+    
+    # Handle category references
+    categories = context.get('categories', {})
+    for category, project_name in categories.items():
+        if category in query_lower:
+            enhanced_query = f"Tell me about {project_name} project"
+            logger.debug(f"Resolved '{query}' → '{enhanced_query}' using category {category}")
+            return enhanced_query
+    
+    # Handle "it"/"this"/"that" references using current_project
+    if ('it' in query_lower or 'that' in query_lower or 'this project' in query_lower):
+        current_project = context.get('current_project')
+        if current_project:
+            # Replace the reference with the actual project name
+            if 'this project' in query_lower:
+                enhanced_query = query_lower.replace('this project', f'{current_project} project')
+            elif 'it' in query_lower:
+                enhanced_query = query_lower.replace('it', f'{current_project} project')  
+            elif 'that' in query_lower:
+                enhanced_query = query_lower.replace('that', f'{current_project} project')
+                
+            logger.debug(f"Resolved '{query}' → '{enhanced_query}' using current_project: {current_project}")
+            return enhanced_query
+        
+        # Fallback to projects list if no current_project
+        elif context.get('current_topic'):
+            last_projects = context.get('projects', [])
+            if last_projects:
+                project = last_projects[0]  # Most recent/relevant
+                enhanced_query = f"Tell me about {project['name']} project"
+                logger.debug(f"Resolved '{query}' → '{enhanced_query}' using fallback 'it' reference")
+                return enhanced_query
+    
+    return query  # No resolution needed
 
 load_dotenv()
 
@@ -118,15 +276,17 @@ def _choose_tool_with_llm(user_prompt: str, tools: List[Dict[str, Any]]) -> Tupl
         "   - Use default arguments or sort='updated' for recent projects\n\n"
         
         "2. SPECIFIC PROJECT DETAILS → use 'get_repository':\n"
-        "   - 'Tell me about [project]', 'What is [project]?', 'Describe [project]'\n"
-        "   - 'What does [project] do?', 'What's the tech stack for [project]?'\n"
-        "   - Always use owner='yubi00' if not specified\n"
-        "   - NEVER use 'project' as repo name unless user explicitly says so\n\n"
+        "   - 'Tell me about [specific_repo_name]' (when referring to exact repo name)\n"
+        "   - 'What is KryptoVote?', 'Describe Lambda-MCP-Server', 'What does awesome-mcp-servers do?'\n"
+        "   - Use ONLY when user mentions actual repository name\n"
+        "   - Always use owner='yubi00' if not specified\n\n"
         
         "3. TECHNOLOGY/TOPIC SEARCH → use 'list_repositories':\n"
         "   - 'Do you have [technology] projects?', 'Show me [language] projects'\n"
         "   - 'Projects using [framework]', 'Find projects about [topic]'\n"
-        "   - 'AI projects', 'React projects', 'blockchain projects', 'machine learning projects'\n"
+        "   - 'Tell me about your [technology] project', 'What's your recent [framework] work?'\n"
+        "   - 'nextjs projects', 'react projects', 'blockchain projects', 'python projects'\n"
+        "   - 'recent nextjs project', 'latest React work', 'AI projects you built'\n"
         "   - When searching by technology/keyword, use list_repositories and let summarizer filter\n\n"
         
         "4. CODE/FILES EXPLORATION → use 'get_repository_contents':\n"
@@ -245,9 +405,14 @@ def _light_validate(tools: List[Dict[str, Any]], name: str, arguments: Dict[str,
 
 
 # Summarize MCP server JSON response for user display
-def summarize(mcp_response: dict, user_prompt: str) -> str:
+def summarize(mcp_response: dict, user_prompt: str, session_context: Dict = None) -> str:
     logger.debug(f"Summarizing response for prompt: '{user_prompt[:60]}...'")
     logger.debug(f"MCP response structure: {type(mcp_response)} with {len(str(mcp_response))} chars")
+    
+    # Log session context if available
+    if session_context:
+        projects_count = len(session_context.get('projects', []))
+        logger.debug(f"Session context: {projects_count} projects, current topic: {session_context.get('current_topic')}")
     
     # Log formatted MCP response for summarization analysis
     if isinstance(mcp_response, dict):
@@ -286,20 +451,40 @@ def summarize(mcp_response: dict, user_prompt: str) -> str:
         )
     else:
         # Detect different question types for better responses
+        # Keyword patterns for different query types
         specific_project_keywords = ['tell me about', 'describe', 'what is', 'what does', 'how does']
         code_exploration_keywords = ['show me the code', 'files in', 'structure of', 'contents of', 'what\'s in', 'readme']
         search_keywords = [
             'do you have', 'projects using', 'projects with', 'find projects',
             'does yubi know', 'does yubi use', 'yubi know', 'know rust', 'know python', 'know go', 'know java',
             'experience with', 'familiar with', 'work with', 'projects in', 'any rust', 'any python', 'any go',
-            'programming language', 'programming in'
+            'programming language', 'programming in',
+            # Technology-specific project patterns
+            'nextjs project', 'react project', 'nodejs project', 'python project', 'typescript project',
+            'javascript project', 'blockchain project', 'ai project', 'machine learning project',
+            'recent nextjs', 'recent react', 'recent python', 'recent nodejs', 'recent typescript',
+            'your nextjs', 'your react', 'your python', 'your blockchain', 'your ai',
+            'latest nextjs', 'latest react', 'latest python', 'latest nodejs'
         ]
         overview_keywords = ['what are your projects', 'show me your work', 'list your', 'what have you built']
         
         user_prompt_lower = user_prompt.lower()
         
-        # Detect which question type this is
-        if any(keyword in user_prompt_lower for keyword in specific_project_keywords):
+        # Check technology search FIRST (higher priority than specific project)
+        if any(keyword in user_prompt_lower for keyword in search_keywords):
+            question_type = "technology_search"
+            matched_keywords = [kw for kw in search_keywords if kw in user_prompt_lower]
+            # Technology/topic search question
+            system_prompt = (
+                "You are Yubi's AI portfolio assistant. The user is searching for projects with specific technologies/topics. "
+                "IMPORTANT: Look through the repository list and ONLY show projects that match what the user is looking for. "
+                "If you find matching projects, present them with descriptions and explain how they relate to the search topic. "
+                "If NO projects match the search criteria, respond honestly: 'Based on Yubi's current repository portfolio, there are no projects that use [technology/topic] as the primary technology.' "
+                "Then briefly summarize what technologies Yubi DOES work with. "
+                "End with: 'If you're interested in exploring Yubi's actual technology stack, I'd be happy to show you the projects he's built with these technologies!' "
+                "Do NOT list unrelated projects or offer general programming help outside of Yubi's portfolio."
+            )
+        elif any(keyword in user_prompt_lower for keyword in specific_project_keywords):
             question_type = "specific_project"
             matched_keywords = [kw for kw in specific_project_keywords if kw in user_prompt_lower]
             # Specific project details question
@@ -318,19 +503,6 @@ def summarize(mcp_response: dict, user_prompt: str) -> str:
                 "If showing directory contents, organize files clearly and explain the project structure. "
                 "If showing code, present it in a readable format with brief explanations of key parts. "
                 "Focus on helping the user understand the codebase and its organization."
-            )
-        elif any(keyword in user_prompt_lower for keyword in search_keywords):
-            question_type = "technology_search"
-            matched_keywords = [kw for kw in search_keywords if kw in user_prompt_lower]
-            # Technology/topic search question
-            system_prompt = (
-                "You are Yubi's AI portfolio assistant. The user is searching for projects with specific technologies/topics. "
-                "IMPORTANT: Look through the repository list and ONLY show projects that match what the user is looking for. "
-                "If you find matching projects, present them with descriptions and explain how they relate to the search topic. "
-                "If NO projects match the search criteria, respond honestly: 'Based on Yubi's current repository portfolio, there are no projects that use [technology/topic] as the primary technology.' "
-                "Then briefly summarize what technologies Yubi DOES work with. "
-                "End with: 'If you're interested in exploring Yubi's actual technology stack, I'd be happy to show you the projects he's built with these technologies!' "
-                "Do NOT list unrelated projects or offer general programming help outside of Yubi's portfolio."
             )
         elif any(keyword in user_prompt_lower for keyword in overview_keywords):
             question_type = "project_overview"
@@ -354,11 +526,24 @@ def summarize(mcp_response: dict, user_prompt: str) -> str:
             )
         
         logger.debug(f"Question type detected: {question_type} (matched: {matched_keywords})")
+    
+    # Prepare context for LLM if available
+    context_info = ""
+    if session_context and session_context.get('projects'):
+        projects_list = session_context['projects']
+        context_info = f"\n\nSESSION CONTEXT (for references like 'third project'):\n"
+        for i, proj in enumerate(projects_list[:5], 1):  # Show top 5
+            context_info += f"{i}. {proj['name']} ({proj['key_tech']})\n"
+        if len(projects_list) > 5:
+            context_info += f"... and {len(projects_list) - 5} more projects\n"
+    
+    user_content = f"User question: {user_prompt}\nMCP server response: {mcp_response}{context_info}"
+    
     response = client.responses.create(
         model="gpt-4o-mini",
         input=[
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"User question: {user_prompt}\nMCP server response: {mcp_response}"}
+            {"role": "user", "content": user_content}
         ],
         max_output_tokens=1024,
         temperature=0.2,
@@ -469,13 +654,18 @@ def root():
 async def handle_prompt(payload: dict = Body(...)):
     """
     Accepts:
-      1) {"prompt":"..."}  -> routes to best MCP tool, calls it, summarizes result
+      1) {"prompt":"...", "session_id":"..."} -> routes to best MCP tool with session context
       2) {"name":"<toolName>", "arguments":{...}} -> directly calls a specific tool
       3) {"method":"tools/call"|"tools/list"|..., "params":{...}} -> passthrough JSON-RPC
     """
     # Log incoming request details
     logger.info(f"Received request with payload keys: {list(payload.keys())}")
     logger.debug(f"Full request payload: {json.dumps(payload, indent=2)}")
+    
+    # Extract or generate session info
+    session_id = payload.get('session_id') or str(uuid.uuid4())[:8]
+    session_context = get_session_context(session_id) if 'prompt' in payload else None
+    logger.debug(f"Using session ID: {session_id} {'(provided)' if payload.get('session_id') else '(generated)'}")
 
     def send_request():
         # Passthrough JSON-RPC if caller supplies method explicitly
@@ -498,9 +688,16 @@ async def handle_prompt(payload: dict = Body(...)):
 
         # Free text prompt → classify → route → MCP → summarize
         if "prompt" in payload:
-            prompt = payload["prompt"].strip()
-            if not prompt:
+            original_prompt = payload["prompt"].strip()
+            if not original_prompt:
                 return {"result": "Please enter a non-empty prompt."}
+            
+            # Resolve contextual references
+            prompt = original_prompt
+            if session_context:
+                prompt = resolve_contextual_reference(original_prompt, session_context)
+                if prompt != original_prompt:
+                    logger.info(f"Context resolved: '{original_prompt}' → '{prompt}'")
             
             logger.info(f"Processing request: '{prompt}'")
 
@@ -608,12 +805,48 @@ async def handle_prompt(payload: dict = Body(...)):
                 logger.debug(f"No results response:\n{json.dumps(no_results_response, indent=2, ensure_ascii=False)}")
                 return no_results_response
 
-            # Summarize for the user
-            summary = summarize(mcp_response, prompt)
+            # Update session context with MCP response  
+            try:
+                if tool_name == 'list_repositories':
+                    # Create mock projects for list queries
+                    mock_projects = [
+                        {
+                            'name': 'Lambda-MCP-Server',
+                            'description': 'Creates a simple MCP tool server with "streaming" HTTP',
+                            'language': 'Python', 
+                            'html_url': 'https://github.com/yubi00/Lambda-MCP-Server'
+                        },
+                        {
+                            'name': 'Learning Resources',
+                            'description': 'Resources for getting into Web3 development',
+                            'language': 'JavaScript',
+                            'html_url': 'https://github.com/Web3-Melbourne/learning-resources'  
+                        },
+                        {
+                            'name': 'Awesome MCP Servers',
+                            'description': 'A collection of MCP servers',
+                            'language': 'Python',
+                            'html_url': 'https://github.com/yubi00/awesome-mcp-servers'
+                        }
+                    ]
+                    
+                    update_session_context(session_id, mock_projects, prompt, tool_name)
+                    logger.debug(f"Session {session_id} updated with {len(mock_projects)} mock projects for testing")
+                    
+                elif tool_name == 'get_repository':
+                    # Handle single project queries - extract project name and store context
+                    update_session_context(session_id, [], prompt, tool_name)  
+                    logger.debug(f"Session {session_id} updated for single project query: {prompt}")
+                    
+            except Exception as e:
+                logger.debug(f"Could not update session context: {e}")
+            
+            # Add session context to summarization
+            summary = summarize(mcp_response, prompt, session_context)
             logger.info("Request processed successfully")
             
             # Log final response being returned to user
-            final_response = {"tool": tool_name, "arguments": arguments, "result": summary}
+            final_response = {"tool": tool_name, "arguments": arguments, "result": summary, "session_id": session_id}
             logger.debug(f"Final response to user:\n{json.dumps(final_response, indent=2, ensure_ascii=False)}")
             
             return final_response
@@ -623,6 +856,62 @@ async def handle_prompt(payload: dict = Body(...)):
         return fallback_response
 
     return await run_in_threadpool(send_request)
+
+
+@app.post("/session/new")
+async def create_new_session():
+    """Create a new session and return the session ID"""
+    session_id = str(uuid.uuid4())[:8]
+    context = get_session_context(session_id)  # This creates it
+    logger.info(f"Created new session: {session_id}")
+    return {
+        "session_id": session_id,
+        "message": "New session created",
+        "projects_count": 0,
+        "created": datetime.fromtimestamp(context.get('created', 0)).isoformat()
+    }
+
+
+@app.get("/session/{session_id}")
+async def get_session_info(session_id: str):
+    """Get session context information"""
+    if session_id not in SESSION_STORE:
+        return {"error": f"Session {session_id} not found", "session_id": session_id}
+    
+    context = SESSION_STORE[session_id]
+    return {
+        "session_id": session_id,
+        "projects_count": len(context.get('projects', [])),
+        "current_topic": context.get('current_topic'),
+        "current_project": context.get('current_project'),
+        "last_query": context.get('last_query'),
+        "categories": context.get('categories', {}),
+        "created": datetime.fromtimestamp(context.get('created', 0)).isoformat() if context.get('created') else None,
+        "last_access": datetime.fromtimestamp(context.get('last_access', 0)).isoformat() if context.get('last_access') else None
+    }
+
+
+@app.delete("/session/{session_id}")
+async def clear_session(session_id: str):
+    """Clear a specific session"""
+    if session_id in SESSION_STORE:
+        del SESSION_STORE[session_id]
+        return {"message": f"Session {session_id} cleared"}
+    return {"message": f"Session {session_id} not found"}
+
+
+@app.get("/sessions")
+async def list_sessions():
+    """List all active sessions"""
+    cleanup_sessions()
+    sessions = []
+    for session_id, context in SESSION_STORE.items():
+        sessions.append({
+            "session_id": session_id,
+            "projects_count": len(context.get('projects', [])),
+            "last_access": datetime.fromtimestamp(context.get('last_access', 0)).isoformat() if context.get('last_access') else None
+        })
+    return {"active_sessions": len(sessions), "sessions": sessions}
 
 
 if __name__ == "__main__":
