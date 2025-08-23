@@ -7,7 +7,6 @@ from fastapi.concurrency import run_in_threadpool
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 import json
-import re
 from typing import Any, Dict, List, Tuple
 from dotenv import load_dotenv
 import logging
