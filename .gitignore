@@ -14,7 +14,6 @@ pnpm-debug.log*
 # Misc
 .DS_Store
 .env
-.env
 .venv
 mcp-client/__pycache__
 mcp-server/__pycache__
