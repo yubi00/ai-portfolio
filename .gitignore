@@ -1,7 +1,5 @@
 # Dependencies
 node_modules/
-mcp-server/.venv
-mcp-client/.venv
 # Builds
 client/dist/
 
