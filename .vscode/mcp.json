@@ -1,11 +1,27 @@
 {
   "servers": {
-    "github-mcp-server-http": {
+    // "github-mcp-server-http": {
+    //   "type": "http",
+    //   "url": "http://127.0.0.1:8000/mcp",
+    //   "headers": {
+    //     "Accept": "application/json, text/event-stream"
+    //   },
+    // },
+    "github-mcp-server-remote-http": {
       "type": "http",
-      "url": "http://127.0.0.1:8000/mcp",
+      "url": "https://yubi-github-mcp-server.onrender.com/mcp",
       "headers": {
         "Accept": "application/json, text/event-stream"
-      }
+      },
+    },
+    "github-mcp-server-stdio": {
+      "type": "stdio",
+      "command": "python",
+      "args": ["mcp-server/server.py"],
+      "env": {
+          "GITHUB_TOKEN": "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",
+          "NODE_ENV": "development"
+        }
     }
   }
 }
