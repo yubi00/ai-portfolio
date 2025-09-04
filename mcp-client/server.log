@@ -1,0 +1,50 @@
+INFO:     Will watch for changes in these directories: ['/home/yubi/projects/ai-portfolio/mcp-client']
+INFO:     Uvicorn running on http://0.0.0.0:9000 (Press CTRL+C to quit)
+INFO:     Started reloader process [65466] using StatReload
+🚀 Starting Ultra-Simple MCP Client with Smart Context Memory...
+✨ Features: Smart Context Resolution | Conversation Memory | LLM-based Reference Resolution
+🎯 Context resolution examples:
+   User: 'What are your last 3 projects?' → Assistant: [lists projects]
+   User: 'Tell me about the second one' → Resolves to specific project name
+   User: 'I'm interested in the first project' → Resolves to specific project name
+INFO:     Started server process [65471]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:49932 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47988 - "POST /prompt HTTP/1.1" 200 OK
+🔗 Context resolved: 'Tell me more about the second one' → 'Tell me more about [Lambda-MCP-Server].'
+INFO:     127.0.0.1:40160 - "POST /prompt HTTP/1.1" 200 OK
+🔗 Context resolved: 'I am interested in the third project' → '"I am interested in the Lambda-MCP-Server project."'
+INFO:     127.0.0.1:57046 - "POST /prompt HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36326 - "GET /sessions/demo_session HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59814 - "POST /prompt HTTP/1.1" 200 OK
+WARNING:  StatReload detected changes in 'main_ultra_simple.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [65471]
+INFO:     Started server process [67541]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:41818 - "POST /prompt HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53074 - "POST /prompt HTTP/1.1" 200 OK
+🔗 Context resolved: 'What about that blockchain thing you mentioned?' → 'What about the blockchain project you mentioned?'
+INFO:     127.0.0.1:51762 - "POST /prompt HTTP/1.1" 200 OK
+🔗 Context resolved: 'Between that and this, which one would you recommend?' → '"Between KryptoVote and this, which one would you recommend?"'
+INFO:     127.0.0.1:53340 - "POST /prompt HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60374 - "POST /prompt HTTP/1.1" 200 OK
+🔗 Context resolved: 'How complex is the first and last one compared to each other?' → 'How complex is the **[yubi-github-mcp-server](https://github.com/yubi00/yubi-github-mcp-server)** compared to the **[url-shortener](https://github.com/yubi00/url-shortener)**?'
+INFO:     127.0.0.1:45016 - "POST /prompt HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57632 - "POST /prompt HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42210 - "POST /prompt HTTP/1.1" 200 OK
+🔗 Context resolved: 'That blockchain one sounds cool, but what about the other blockchain thing?' → 'What about the [ethereum-dapp-boilerplate]?'
+INFO:     127.0.0.1:58458 - "POST /prompt HTTP/1.1" 200 OK
+🔗 Context resolved: 'What about it?' → 'What about the **ethereum-dapp-boilerplate**?'
+INFO:     127.0.0.1:55686 - "POST /prompt HTTP/1.1" 200 OK
+🔗 Context resolved: 'Could you compare the second and fourth projects in terms of learning value?' → 'Could you compare the **Hardhat** project and the **ReactJS** project in terms of learning value?'
+INFO:     127.0.0.1:37086 - "POST /prompt HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [67541]
+INFO:     Stopping reloader process [65466]

@@ -8,6 +8,7 @@ export default function App() {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const termRef = useRef<Terminal | null>(null)
   const fitRef = useRef<FitAddon | null>(null)   // keep a handle to FitAddon
+  const sessionIdRef = useRef<string | null>(null)  // Immediate access to session ID
   const [showIntroBanner, setShowIntroBanner] = useState(true)
   const [sessionId, setSessionId] = useState<string | null>(null)
 
@@ -119,18 +120,23 @@ export default function App() {
 
     switch (cmd) {
       case 'help':
-        term.writeln('Available commands:')
+        term.writeln('🤖 \x1b[1mYubi AI Portfolio Assistant\x1b[0m')
+        term.writeln('')
+        term.writeln('\x1b[1mHow to interact:\x1b[0m')
+        term.writeln('  • Ask me about my projects, skills, or experience')
+        term.writeln('  • Examples: "What are your projects?"')
+        term.writeln('            "Tell me about your technical skills"')
+        term.writeln('            "What programming languages do you know?"')
+        term.writeln('')
+        term.writeln('\x1b[1mAvailable commands:\x1b[0m')
         term.writeln('  help         - Show this help message')
         term.writeln('  clear        - Clear the terminal')
         term.writeln('  info         - Show server info')
         term.writeln('  ping         - Test server connection')
-        term.writeln('  session      - Show current session info')
-        term.writeln('  new-session  - Start a new conversation session')
         term.writeln('')
-        term.writeln('💬 \x1b[1mConversational Features:\x1b[0m')
-        term.writeln('  First ask: "Tell me your 5 projects"')
-        term.writeln('  Then ask: "Tell me about the third one" ← Context remembered!')
-        term.writeln('  Or ask: "What about the blockchain project?"')
+        term.writeln('💬 \x1b[1mAdvanced: Contextual Conversations\x1b[0m')
+        term.writeln('  Ask: "Tell me your 5 projects"')
+        term.writeln('  Then: "Tell me about the third one" ← Context remembered!')
         maybeHideIntroBanner()
         break
 
@@ -145,7 +151,6 @@ export default function App() {
 
       case 'info':
         term.writeln('AI Portfolio Terminal v0.1.0')
-        term.writeln('Ready for AI integration')
         maybeHideIntroBanner()
         break
 
@@ -184,9 +189,13 @@ export default function App() {
           
           // Prepare request payload with session management
           const payload: { prompt: string; session_id?: string } = { prompt: command }
-          if (sessionId) {
-            payload.session_id = sessionId
+          // Use ref for immediate access to session ID (avoiding React state timing issues)
+          const currentSessionId = sessionIdRef.current || sessionId
+          if (currentSessionId) {
+            payload.session_id = currentSessionId
           }
+          
+          console.log('🔍 Frontend sending:', { prompt: command, sessionId, sessionIdRef: sessionIdRef.current, currentSessionId, payload })
 
           const res = await fetch('http://127.0.0.1:9000/prompt', {
             method: 'POST',
@@ -202,9 +211,10 @@ export default function App() {
             
             // Store session_id returned from backend
             if (data?.session_id) {
-              const isNewSession = !sessionId  // Only true for very first conversation
-              if (isNewSession) {
-                setSessionId(data.session_id)
+              console.log('🔍 Frontend received session_id:', data.session_id, 'current sessionIdRef:', sessionIdRef.current)
+              
+              // Show "Session started" only if we don't already have a session
+              if (!sessionIdRef.current) {
                 // First session created - show after clearing thinking line
                 term.write('\x1b[1A\x1b[2K') // Move up one line and clear it
                 term.writeln(`\x1b[2m\x1b[90m[Session ${data.session_id} started]\x1b[0m`)
@@ -212,6 +222,10 @@ export default function App() {
                 // Subsequent conversations - just clear thinking line
                 term.write('\x1b[1A\x1b[2K') // Move up one line and clear it
               }
+              
+              // Always update both the state and ref from the server response
+              setSessionId(data.session_id)
+              sessionIdRef.current = data.session_id
             } else {
               // Clear thinking line
               term.write('\x1b[1A\x1b[2K') // Move up one line and clear it
@@ -223,15 +237,10 @@ export default function App() {
             else if (typeof data === 'string') answer = data
             else answer = JSON.stringify(data, null, 2)
 
-            // Show source indicator and conversation info
+            // Show source indicator
             const sourceIndicator = data?.source_indicator || '🤖'
-            const conversationLength = data?.conversation_length || 0
             
-            if (conversationLength > 1) {
-              term.writeln(`\x1b[2m\x1b[90m${sourceIndicator} [Message ${conversationLength}]\x1b[0m`)
-            } else {
-              term.writeln(`\x1b[2m\x1b[90m${sourceIndicator}\x1b[0m`)
-            }
+            term.writeln(`\x1b[2m\x1b[90m${sourceIndicator}\x1b[0m`)
             term.writeln(`\x1b[38;5;250m${answer}\x1b[0m\r\n`)
             maybeHideIntroBanner()
           }

@@ -25,8 +25,8 @@ app.add_middleware(
 OPENAI_CLIENT = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 MCP_SERVER_URL = os.getenv("MCP_SERVER_URL", "http://127.0.0.1:8000/mcp")
 
-# Simple session store
-SESSIONS: Dict[str, List[Dict]] = {}
+# Super simple session store - just track last response and conversation
+SESSIONS: Dict[str, Dict] = {}
 
 def classify_prompt(prompt: str) -> bool:
     """Proper relevancy classification (from working main.py)"""
@@ -164,49 +164,72 @@ def route_prompt(prompt: str) -> tuple[str, dict]:
     else:
         return "list_repositories", {"type": "owner"}
 
-def resolve_contextual_references(prompt: str, session_history: List[Dict]) -> str:
-    """Simple contextual reference resolution"""
-    if not session_history:
+def smart_context_resolver(prompt: str, session_id: str) -> str:
+    """Super simple but smart context resolution using LLM + last response"""
+    if session_id not in SESSIONS or not SESSIONS[session_id].get("last_response"):
         return prompt
-        
-    # Check for contextual references
+    
+    # Check if prompt has contextual references
     prompt_lower = prompt.lower()
-    if any(ref in prompt_lower for ref in ["the second one", "second project", "the first one", "first project", "that project", "this project", "it"]):
-        # Get the last assistant response for context
-        last_response = session_history[-1].get('assistant', '') if session_history else ''
+    context_words = ["first", "second", "third", "1st", "2nd", "3rd", "the first", "the second", 
+                    "first one", "second one", "that one", "this one", "it", "that", "this project"]
+    
+    has_context_reference = any(word in prompt_lower for word in context_words)
+    if not has_context_reference:
+        return prompt
+    
+    # Use LLM to resolve with last response context
+    last_response = SESSIONS[session_id]["last_response"]
+    
+    try:
+        resp = OPENAI_CLIENT.responses.create(
+            model="gpt-4o-mini",
+            input=f"""CONTEXT RESOLVER: The user is referring to something from my previous response. 
+            
+Previous response: "{last_response}"
+Current user question: "{prompt}"
+
+If the user is referring to a specific project from the previous response, rewrite their question to be explicit.
+
+Examples:
+- "tell me about the second one" → "tell me about [specific project name from previous response]"  
+- "I'm interested in the first project" → "I'm interested in [first project name mentioned]"
+- "what about that one" → "what about [project name]"
+
+Return ONLY the rewritten question, or the original if no specific project reference is found.""",
+            max_output_tokens=100,
+            temperature=0.0
+        )
         
-        # Use LLM to resolve the reference
-        try:
-            resp = OPENAI_CLIENT.responses.create(
-                model="gpt-4o-mini",
-                input=f"""Resolve this contextual reference based on the conversation:
-
-Last response: "{last_response}"
-Current prompt: "{prompt}"
-
-If the current prompt refers to a specific project mentioned in the last response, rewrite the prompt to be explicit. For example:
-- "tell me more about the second one" → "tell me more about buchu-boutique project"
-- "what about the first project" → "what about KryptoVote project"
-
-Return ONLY the rewritten prompt, or the original prompt if no reference needs resolving.""",
-                max_output_tokens=100,
-                temperature=0.0
-            )
-            resolved = resp.output[0].content[0].text.strip()
-            return resolved if resolved != prompt else prompt
-        except:
-            return prompt
+        resolved = resp.output[0].content[0].text.strip()
+        if resolved != prompt and len(resolved) > 0:
+            print(f"🔗 Context resolved: '{prompt}' → '{resolved}'")
+            return resolved
+            
+    except Exception as e:
+        print(f"Context resolution failed: {e}")
     
     return prompt
 
-def summarize_with_context(prompt: str, data: str, session_history: List[Dict]) -> str:
-    """Ultra-simple summarization with session context"""
+def summarize_with_context(prompt: str, mcp_response: dict, session_context: Dict) -> str:
+    """Enhanced summarization with proper session context"""
     try:
-        # Build conversation context  
+        # Build conversation history context
+        history = session_context.get("history", [])
         context = "\n".join([
             f"User: {msg['user']}\nAssistant: {msg['assistant']}" 
-            for msg in session_history[-2:]  # Last 2 exchanges for context
+            for msg in history[-2:]  # Last 2 exchanges for context
         ])
+        
+        # Add structured project context for ordinal references
+        context_info = ""
+        if session_context.get("projects"):
+            projects_list = session_context["projects"]
+            context_info = "\n\nSESSION CONTEXT (for references like 'third project'):\n"
+            for i, proj in enumerate(projects_list[:5], 1):
+                context_info += f"{i}. {proj['name']} ({proj['key_tech']})\n"
+            if len(projects_list) > 5:
+                context_info += f"... and {len(projects_list) - 5} more projects\n"
         
         system_prompt = f"""You are Yubi's GitHub portfolio assistant. Provide a friendly, organized summary of the technical data.
 
@@ -214,19 +237,20 @@ Previous conversation:
 {context}
 
 Current question: "{prompt}"
-Technical data: {data}
+Technical data: {mcp_response}
+{context_info}
 
 Provide a conversational, helpful summary that builds on our conversation."""
 
         resp = OPENAI_CLIENT.responses.create(
-            model="gpt-4.1-mini",
+            model="gpt-4o-mini",
             input=system_prompt,
             max_output_tokens=400,
             temperature=0.2
         )
         return resp.output[0].content[0].text.strip()
     except Exception as e:
-        return f"Here's the information I found: {data[:300]}..."
+        return f"Here's the information I found: {str(mcp_response)[:300]}..."
 
 def call_mcp_tool(tool_name: str, tool_args: dict) -> dict:
     """Proper MCP tool calling using the working approach from main.py"""
@@ -280,82 +304,127 @@ def root():
 
 @app.get("/sessions/{session_id}")
 def get_session(session_id: str):
-    """Get session history"""
+    """Get session history and context"""
     if session_id not in SESSIONS:
         return {"error": "Session not found"}
     
+    session = SESSIONS[session_id]
     return {
         "session_id": session_id,
-        "message_count": len(SESSIONS[session_id]),
-        "history": SESSIONS[session_id][-10:]  # Last 10 messages
+        "message_count": len(session.get("history", [])),
+        "last_response": session.get("last_response", ""),
+        "history": session.get("history", [])[-10:]  # Last 10 messages
     }
 
 @app.post("/prompt")
 def handle_prompt(payload: dict):
-    """Ultra-simple prompt handler with sessions!"""
+    """Super simple but smart prompt handler with context memory"""
     prompt = payload.get("prompt", "")
     session_id = payload.get("session_id", str(uuid.uuid4())[:8])
+    
+    # Debug logging
+    print(f"🔍 Received request: prompt='{prompt}', session_id from payload={payload.get('session_id')}, using session_id='{session_id}'")
     
     if not prompt:
         return {"error": "No prompt provided"}
     
     # Initialize session if needed
     if session_id not in SESSIONS:
-        SESSIONS[session_id] = []
+        print(f"📝 Creating new session: {session_id}")
+        SESSIONS[session_id] = {"history": [], "last_response": ""}
+    else:
+        print(f"♻️  Using existing session: {session_id} (has {len(SESSIONS[session_id]['history'])} messages)")
     
-    session_history = SESSIONS[session_id]
+    print(f"🗂️  Active sessions: {list(SESSIONS.keys())}")
+    session = SESSIONS[session_id]
     
-    # 1. Resolve contextual references first
-    resolved_prompt = resolve_contextual_references(prompt, session_history)
+    # 1. Resolve contextual references using LLM + last response  
+    resolved_prompt = smart_context_resolver(prompt, session_id)
     
-    # 2. Check relevancy (using proper classification from main.py)
+    # 2. Check relevancy
     is_relevant = classify_prompt(resolved_prompt)
     if not is_relevant:
-        # Generate friendly chat response for irrelevant prompts
-        reply = chat_response(prompt, session_history)
-        
-        # Save to session
-        SESSIONS[session_id].append({"user": prompt, "assistant": reply})
+        reply = chat_response(prompt, session["history"])
+        session["history"].append({"user": prompt, "assistant": reply})
+        session["last_response"] = reply
         
         return {
             "reply": reply, 
             "session_id": session_id,
-            "source": "friendly_chat"
+            "source": "friendly_chat",
+            "resolved": resolved_prompt if resolved_prompt != prompt else None
         }
     
-    # 3. Route to MCP tool (use resolved prompt)
+    # 3. Route to MCP tool
     tool_name, tool_args = route_prompt(resolved_prompt)
     
     # 4. Call MCP server
     mcp_response = call_mcp_tool(tool_name, tool_args)
     
-    # 5. Extract result and handle errors
+    # 5. Handle errors
     if "error" in mcp_response:
-        reply = f"I'm sorry, I encountered an error accessing the project data: {mcp_response['error']}"
-        SESSIONS[session_id].append({"user": prompt, "assistant": reply})
+        reply = f"I encountered an error: {mcp_response['error']}"
+        session["history"].append({"user": prompt, "assistant": reply})
+        session["last_response"] = reply
         return {
             "reply": reply,
             "session_id": session_id,
             "source": "error",
-            "tool_used": f"{tool_name}({tool_args})"
+            "resolved": resolved_prompt if resolved_prompt != prompt else None
         }
     
-    # 6. Summarize with session context using proper MCP response format
-    summary = summarize_with_context(resolved_prompt, str(mcp_response), session_history)
+    # 6. Generate response with conversation context
+    summary = simple_summarizer(resolved_prompt, mcp_response, session_id)
     
-    # 6. Save to session
-    SESSIONS[session_id].append({"user": prompt, "assistant": summary})
+    # 7. Save to session
+    session["history"].append({"user": prompt, "assistant": summary})
+    session["last_response"] = summary
     
     return {
         "reply": summary,
         "session_id": session_id,
         "tool_used": f"{tool_name}({tool_args})",
-        "source": "mcp_server",
-        "conversation_length": len(SESSIONS[session_id])
+        "source": "mcp_server", 
+        "conversation_length": len(session["history"]),
+        "resolved": resolved_prompt if resolved_prompt != prompt else None
     }
 
+def simple_summarizer(prompt: str, mcp_response: dict, session_id: str) -> str:
+    """Simple but effective summarizer that remembers conversation context"""
+    try:
+        # Get conversation history for context
+        conversation_context = ""
+        if session_id in SESSIONS and SESSIONS[session_id].get("history"):
+            recent = SESSIONS[session_id]["history"][-2:]  # Last 2 exchanges
+            conversation_context = "\n".join([
+                f"Previous - User: {msg['user']}\nPrevious - Assistant: {msg['assistant']}" 
+                for msg in recent
+            ])
+        
+        context_prompt = f"""You are Yubi's GitHub portfolio assistant. Provide a friendly, conversational response.
+
+{"Previous conversation:\n" + conversation_context + "\n" if conversation_context else ""}
+Current question: "{prompt}"
+Technical data: {mcp_response}
+
+Give a natural, helpful response that builds on our conversation."""
+
+        resp = OPENAI_CLIENT.responses.create(
+            model="gpt-4o-mini",
+            input=context_prompt,
+            max_output_tokens=400,
+            temperature=0.3
+        )
+        return resp.output[0].content[0].text.strip()
+        
+    except Exception as e:
+        return f"Here's what I found: {str(mcp_response)[:300]}..."
+
 if __name__ == "__main__":
-    print("🚀 Starting Ultra-Simple MCP Client with Sessions...")
-    print("📊 Code reduction: 920 lines → 120 lines (87% less!)")
-    print("✨ Features: Session Management | Smart Routing | Friendly Chat")
+    print("🚀 Starting Ultra-Simple MCP Client with Smart Context Memory...")
+    print("✨ Features: Smart Context Resolution | Conversation Memory | LLM-based Reference Resolution")
+    print("🎯 Context resolution examples:")
+    print("   User: 'What are your last 3 projects?' → Assistant: [lists projects]")
+    print("   User: 'Tell me about the second one' → Resolves to specific project name")
+    print("   User: 'I'm interested in the first project' → Resolves to specific project name")
     uvicorn.run("main_ultra_simple:app", host="0.0.0.0", port=9000, reload=True)
