@@ -218,7 +218,8 @@ export default function App() {
             }
 
             let answer = ''
-            if (typeof data?.reply === 'string') answer = data.reply
+            if (typeof data?.result === 'string') answer = data.result
+            else if (typeof data?.reply === 'string') answer = data.reply
             else if (typeof data === 'string') answer = data
             else answer = JSON.stringify(data, null, 2)
 

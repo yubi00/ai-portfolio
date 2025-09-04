@@ -1,12 +1,12 @@
 {
   "servers": {
-    // "github-mcp-server-http": {
-    //   "type": "http",
-    //   "url": "http://127.0.0.1:8000/mcp",
-    //   "headers": {
-    //     "Accept": "application/json, text/event-stream"
-    //   },
-    // },
+    "github-mcp-server-http": {
+      "type": "http",
+      "url": "http://127.0.0.1:8000/mcp",
+      "headers": {
+        "Accept": "application/json, text/event-stream"
+      },
+    },
     "github-mcp-server-remote-http": {
       "type": "http",
       "url": "https://yubi-github-mcp-server.onrender.com/mcp",
