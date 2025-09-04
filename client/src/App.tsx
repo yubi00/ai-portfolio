@@ -178,6 +178,10 @@ export default function App() {
 
       default:
         try {
+          // Show thinking indicator while processing
+          term.writeln('\r\n\x1b[1m\x1b[38;5;81mYubi Assistant:\x1b[0m')
+          term.writeln('\x1b[2m\x1b[90m🤔 Thinking...\x1b[0m')
+          
           // Prepare request payload with session management
           const payload: { prompt: string; session_id?: string } = { prompt: command }
           if (sessionId) {
@@ -190,30 +194,50 @@ export default function App() {
             body: JSON.stringify(payload),
           })
           if (!res.ok) {
-            term.writeln('\x1b[31mError: Failed to fetch from MCP client.\x1b[0m')
+            // Clear thinking line and show error
+            term.write('\x1b[1A\x1b[2K') // Move up one line and clear it
+            term.writeln('\x1b[31m❌ Error: Failed to fetch from MCP client.\x1b[0m')
           } else {
             const data = await res.json()
             
             // Store session_id returned from backend
-            if (data?.session_id && data.session_id !== sessionId) {
-              setSessionId(data.session_id)
-              if (!sessionId) {
-                // First session created
+            if (data?.session_id) {
+              const isNewSession = !sessionId  // Only true for very first conversation
+              if (isNewSession) {
+                setSessionId(data.session_id)
+                // First session created - show after clearing thinking line
+                term.write('\x1b[1A\x1b[2K') // Move up one line and clear it
                 term.writeln(`\x1b[2m\x1b[90m[Session ${data.session_id} started]\x1b[0m`)
+              } else {
+                // Subsequent conversations - just clear thinking line
+                term.write('\x1b[1A\x1b[2K') // Move up one line and clear it
               }
+            } else {
+              // Clear thinking line
+              term.write('\x1b[1A\x1b[2K') // Move up one line and clear it
             }
 
             let answer = ''
-            if (typeof data?.result === 'string') answer = data.result
+            if (typeof data?.reply === 'string') answer = data.reply
             else if (typeof data === 'string') answer = data
             else answer = JSON.stringify(data, null, 2)
 
-            term.writeln('\r\n\x1b[1m\x1b[38;5;81mYubi Assistant:\x1b[0m')
+            // Show source indicator and conversation info
+            const sourceIndicator = data?.source_indicator || '🤖'
+            const conversationLength = data?.conversation_length || 0
+            
+            if (conversationLength > 1) {
+              term.writeln(`\x1b[2m\x1b[90m${sourceIndicator} [Message ${conversationLength}]\x1b[0m`)
+            } else {
+              term.writeln(`\x1b[2m\x1b[90m${sourceIndicator}\x1b[0m`)
+            }
             term.writeln(`\x1b[38;5;250m${answer}\x1b[0m\r\n`)
             maybeHideIntroBanner()
           }
         } catch {
-          term.writeln('\x1b[31mError: Could not reach MCP client.\x1b[0m')
+          // Clear thinking line and show error
+          term.write('\x1b[1A\x1b[2K') // Move up one line and clear it
+          term.writeln('\x1b[31m❌ Error: Could not reach MCP client.\x1b[0m')
         }
         break
     }
