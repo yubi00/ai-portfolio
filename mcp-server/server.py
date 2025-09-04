@@ -8,11 +8,13 @@ from dotenv import load_dotenv
 from github import Github, GithubException
 from mcp.server.fastmcp import FastMCP
 
+
 # -----------------------------
 # Helpers
 # -----------------------------
 def _err_msg(e: GithubException) -> str:
     return e.data.get("message") if getattr(e, "data", None) else str(e)
+
 
 # -----------------------------
 # Load environment (GITHUB_TOKEN)
@@ -40,11 +42,14 @@ mcp = FastMCP(
         "- Get repository contents and file information\n\n"
         "Authentication is handled via GITHUB_TOKEN environment variable."
     ),
+    host="0.0.0.0",
+    port=8000,
 )
 
 # -----------------------------
 # Tools
 # -----------------------------
+
 
 @mcp.tool()
 def list_repositories(
@@ -73,7 +78,7 @@ def list_repositories(
         sort_key = {
             "created": lambda r: r.created_at,
             "updated": lambda r: r.updated_at,
-            "pushed":  lambda r: r.pushed_at,
+            "pushed": lambda r: r.pushed_at,
             "full_name": lambda r: r.full_name.lower(),
         }[sort]
         repos = sorted(repos_iter, key=sort_key, reverse=(direction == "desc"))
@@ -193,7 +198,9 @@ def get_repository_contents(
     """Get the contents of a repository directory or a single file (decoded text)."""
     try:
         r = gh.get_repo(f"{owner}/{repo}")
-        contents = r.get_contents(path or "", ref=ref)  # ContentFile or list[ContentFile]
+        contents = r.get_contents(
+            path or "", ref=ref
+        )  # ContentFile or list[ContentFile]
 
         if isinstance(contents, list):
             listing = [
@@ -207,12 +214,18 @@ def get_repository_contents(
                 }
                 for c in contents
             ]
-            return f"Directory Contents ({path or 'root'}):\n\n" + json.dumps(listing, indent=2)
+            return f"Directory Contents ({path or 'root'}):\n\n" + json.dumps(
+                listing, indent=2
+            )
         else:
             if contents.encoding == "base64" and contents.content:
-                text = base64.b64decode(contents.content).decode("utf-8", errors="replace")
+                text = base64.b64decode(contents.content).decode(
+                    "utf-8", errors="replace"
+                )
             else:
-                text = getattr(contents, "decoded_content", b"").decode("utf-8", errors="replace")
+                text = getattr(contents, "decoded_content", b"").decode(
+                    "utf-8", errors="replace"
+                )
 
             preview = text if len(text) <= 4000 else text[:4000] + "\n...[truncated]..."
             file_info = {
@@ -236,17 +249,10 @@ def get_repository_contents(
 # Entrypoints (stdio vs HTTP)
 # -----------------------------
 if __name__ == "__main__":
-    if os.getenv("NODE_ENV") == "production" or os.getenv("AGENTCORE") == "true":
+    if os.getenv("NODE_ENV") == "production":
         print("Running in production mode, starting HTTP server...")
-        import uvicorn
         mcp.settings.stateless_http = True
-        mcp.settings.port = 8000
-        uvicorn.run(mcp.streamable_http_app(), host="0.0.0.0", port=8000)
+        mcp.run(transport="streamable-http")
     else:
         print("Running in development mode, starting stdio server...")
-        import asyncio
-
-        async def main():
-            await mcp.run_stdio_async()
-
-        asyncio.run(main())
+        mcp.run(transport="stdio")
