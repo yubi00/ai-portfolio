@@ -197,9 +197,14 @@ def classify_prompt(prompt: str) -> bool:
         return False
     
     system_prompt = (
-        "You are a strict classifier. Reply with 'relevant' if the user prompt is about Yubi's personal projects (including all projects, some projects, or a particular project), skills, experiences, or anything related to Yubi's GitHub repositories. "
-        "This includes questions like 'Tell me about your projects', 'Tell me about this project', 'What are your skills?', 'Describe your experience', or any mention of MCP (Model Context Protocol), servers, Python projects, or specific technologies. "
-        "Reply with 'irrelevant' if the prompt is about anything else (such as news, weather, sports, general greetings like 'hi', or general topics not related to Yubi's projects, skills, or experiences). Only reply with 'relevant' or 'irrelevant'."
+        "You are a strict classifier. Reply with 'relevant' if the user prompt is about Yubi's personal projects, skills, experiences, or technical work. This includes: "
+        "- Questions about projects: 'Tell me about your projects', 'What have you built?' "
+        "- Technology/language questions: 'Do you work with Python?', 'Any Rust projects?', 'Have you used React?' "
+        "- Skills and experience: 'What are your skills?', 'Describe your experience' "
+        "- Specific project inquiries: 'Tell me about this project', contextual references like 'the first one', 'the second one' "
+        "- Any mention of programming languages, frameworks, technologies, MCP, servers, databases, etc. "
+        "Reply with 'irrelevant' ONLY if the prompt is clearly about unrelated topics (news, weather, sports, personal life not related to coding, math problems, general greetings). "
+        "When in doubt about technical topics, classify as 'relevant'. Only reply with 'relevant' or 'irrelevant'."
     )
     
     try:
@@ -223,11 +228,13 @@ def classify_prompt(prompt: str) -> bool:
         return True  # Default to relevant if OpenAI fails
 
 def chat_response(prompt: str, session_history: List[Dict]) -> str:
-    """Generate friendly response for irrelevant prompts"""
+    """Generate natural, contextual response for irrelevant prompts that redirects to Yubi's work"""
     try:
         system_prompt = (
-            "You are Yubi's AI portfolio assistant. Respond kindly and conversationally to questions not about Yubi's projects. "
-            "Encourage them to ask about Yubi's projects, skills, or experiences."
+            "You are Yubi's AI portfolio assistant. The user just asked about something not related to Yubi's projects, skills, or coding work. "
+            "Acknowledge what they asked about in a friendly way, but politely decline to help with that topic. "
+            "Explain that you're specifically designed to help with questions about Yubi's projects, skills, and coding experiences. "
+            "Redirect them kindly to ask about Yubi's technical work instead. Be warm but clear about your focus area."
         )
         
         response = OPENAI_CLIENT.responses.create(
@@ -236,12 +243,12 @@ def chat_response(prompt: str, session_history: List[Dict]) -> str:
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt}
             ],
-            max_output_tokens=256,
-            temperature=0.5
+            max_output_tokens=200,  # Increased for more natural responses
+            temperature=0.7  # Higher temperature for more natural variation
         )
         return response.output_text.strip()
     except Exception as e:
-        return "Hi! I'm here to help you learn about Yubi's projects and skills. What would you like to know?"
+        return "I'd love to help, however I'm primarily focused on Yubi's projects, skills, and experiences! What would you like to know about the technical work?"
 
 def smart_context_resolver(prompt: str, session_id: str) -> str:
     """Enhanced context resolution using LLM + last response (from simplified version)"""
@@ -469,48 +476,37 @@ def extract_search_term(prompt: str) -> str:
     return prompt_clean.strip()
 
 def summarize_mcp_response(mcp_response: dict, original_prompt: str, session_context: Dict = None) -> str:
-    """Enhanced summarization with session context"""
+    """Simple but effective summarizer (adopted from ultra_simple version)"""
     try:
-        # Prepare context info if available
-        context_info = ""
+        # Get conversation history for context (same as ultra_simple approach)
+        conversation_context = ""
         if session_context and session_context.get("history"):
-            recent_history = session_context["history"][-3:]  # Last 3 exchanges
-            context_info = f"\n\nRecent conversation context:\n"
-            for exchange in recent_history:
-                context_info += f"User: {exchange.get('user', '')}\n"
-                context_info += f"Assistant: {exchange.get('assistant', '')[:200]}...\n"
+            recent = session_context["history"][-2:]  # Last 2 exchanges
+            conversation_context = "\n".join([
+                f"Previous - User: {msg['user']}\nPrevious - Assistant: {msg['assistant']}" 
+                for msg in recent
+            ])
         
-        system_prompt = f"""You are Yubi's AI portfolio assistant specializing in showcasing technical projects and expertise.
+        context_prompt = f"""You are Yubi's GitHub portfolio assistant. Provide a friendly, conversational response.
 
-IMPORTANT: MCP stands for "Model Context Protocol" (not Minecraft). It's a new protocol for AI tool integration.
-
-{context_info}
-
+{"Previous conversation:\n" + conversation_context + "\n" if conversation_context else ""}
 Current question: "{original_prompt}"
-MCP Server Response: {mcp_response}
+Technical data: {mcp_response}
 
-Create an engaging, professional summary that:
-- Highlights Yubi's technical skills and project diversity
-- Uses clear, professional language suitable for portfolio showcase  
-- Provides specific details about technologies, languages, and project purposes
-- Shows understanding of modern development practices (MCP = Model Context Protocol)
-- If building on previous conversation, connect naturally to prior context
-- Format with clear headings and bullet points when appropriate
-- Emphasize the innovative aspects of projects, especially MCP-related work"""
+Give a natural, helpful response that builds on our conversation."""
 
         response = OPENAI_CLIENT.responses.create(
             model="gpt-4o-mini",
             input=[
-                {"role": "system", "content": system_prompt}
+                {"role": "user", "content": context_prompt}
             ],
-            max_output_tokens=500,
-            temperature=0.2
+            max_output_tokens=400,  # Reduced from 500
+            temperature=0.3        # Increased from 0.2 for more natural responses
         )
-        
         return response.output_text.strip()
         
     except Exception as e:
-        return f"Here's the information from the MCP server: {str(mcp_response)[:400]}..."
+        return f"Here's what I found: {str(mcp_response)[:300]}..."
 
 @app.get("/")
 def root():
@@ -571,9 +567,12 @@ def handle_prompt(payload: dict):
     
     # 1. Resolve contextual references
     resolved_prompt = smart_context_resolver(prompt, session_id)
+    if resolved_prompt != prompt:
+        print(f"📝 Context resolution: '{prompt}' → '{resolved_prompt}'")
     
     # 2. Check relevancy
     is_relevant = classify_prompt(resolved_prompt)
+    print(f"🎯 Classification: '{resolved_prompt}' → {'RELEVANT' if is_relevant else 'IRRELEVANT'}")
     if not is_relevant:
         reply = chat_response(prompt, session["history"])
         session["history"].append({"user": prompt, "assistant": reply})
