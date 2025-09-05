@@ -1,50 +1,71 @@
+nohup: ignoring input
 INFO:     Will watch for changes in these directories: ['/home/yubi/projects/ai-portfolio/mcp-client']
 INFO:     Uvicorn running on http://0.0.0.0:9000 (Press CTRL+C to quit)
-INFO:     Started reloader process [65466] using StatReload
-🚀 Starting Ultra-Simple MCP Client with Smart Context Memory...
-✨ Features: Smart Context Resolution | Conversation Memory | LLM-based Reference Resolution
-🎯 Context resolution examples:
-   User: 'What are your last 3 projects?' → Assistant: [lists projects]
-   User: 'Tell me about the second one' → Resolves to specific project name
-   User: 'I'm interested in the first project' → Resolves to specific project name
-INFO:     Started server process [65471]
+INFO:     Started reloader process [158025] using StatReload
+🚀 Starting Proper MCP Client with Full Protocol Compliance...
+✨ Architecture: Client → MCP Server (handles routing) → Tools
+🔧 Features: Full MCP initialization | Server-side routing | Session management
+📋 Initialization sequence: initialize → capabilities exchange → initialized notification
+🔗 Initializing MCP connection...
+📤 Sending initialize request to http://127.0.0.1:8000/mcp
+✅ MCP initialized successfully
+   Server: github-mcp-server v1.13.0
+   Protocol: 2024-11-05
+   Capabilities: ['experimental', 'prompts', 'resources', 'tools']
+📤 Sending initialized notification...
+✅ MCP initialization complete - ready for operations
+🎯 MCP ready - starting HTTP server...
+INFO:     Started server process [158038]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
-INFO:     127.0.0.1:49932 - "GET / HTTP/1.1" 200 OK
-INFO:     127.0.0.1:47988 - "POST /prompt HTTP/1.1" 200 OK
-🔗 Context resolved: 'Tell me more about the second one' → 'Tell me more about [Lambda-MCP-Server].'
-INFO:     127.0.0.1:40160 - "POST /prompt HTTP/1.1" 200 OK
-🔗 Context resolved: 'I am interested in the third project' → '"I am interested in the Lambda-MCP-Server project."'
-INFO:     127.0.0.1:57046 - "POST /prompt HTTP/1.1" 200 OK
-INFO:     127.0.0.1:36326 - "GET /sessions/demo_session HTTP/1.1" 200 OK
-INFO:     127.0.0.1:59814 - "POST /prompt HTTP/1.1" 200 OK
-WARNING:  StatReload detected changes in 'main_ultra_simple.py'. Reloading...
+🔍 Processing: prompt='hi yubi', session_id='test_greeting'
+⚠️  Classification failed: Error code: 400 - {'error': {'message': "Invalid 'max_output_tokens': integer below minimum value. Expected a value >= 16, but got 10 instead.", 'type': 'invalid_request_error', 'param': 'max_output_tokens', 'code': 'integer_below_min_value'}} - defaulting to relevant
+🔗 Initializing MCP connection...
+📤 Sending initialize request to http://127.0.0.1:8000/mcp
+✅ MCP initialized successfully
+   Server: github-mcp-server v1.13.0
+   Protocol: 2024-11-05
+   Capabilities: ['experimental', 'prompts', 'resources', 'tools']
+📤 Sending initialized notification...
+✅ MCP initialization complete - ready for operations
+🔧 MCP Server routing: list_repositories with portfolio context: {'type': 'owner', 'sort': 'updated', 'direction': 'desc'}
+INFO:     127.0.0.1:33832 - "POST /prompt HTTP/1.1" 200 OK
+WARNING:  StatReload detected changes in 'main_proper_mcp.py'. Reloading...
 INFO:     Shutting down
 INFO:     Waiting for application shutdown.
 INFO:     Application shutdown complete.
-INFO:     Finished server process [65471]
-INFO:     Started server process [67541]
+INFO:     Finished server process [158038]
+INFO:     Started server process [158722]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
-INFO:     127.0.0.1:41818 - "POST /prompt HTTP/1.1" 200 OK
-INFO:     127.0.0.1:53074 - "POST /prompt HTTP/1.1" 200 OK
-🔗 Context resolved: 'What about that blockchain thing you mentioned?' → 'What about the blockchain project you mentioned?'
-INFO:     127.0.0.1:51762 - "POST /prompt HTTP/1.1" 200 OK
-🔗 Context resolved: 'Between that and this, which one would you recommend?' → '"Between KryptoVote and this, which one would you recommend?"'
-INFO:     127.0.0.1:53340 - "POST /prompt HTTP/1.1" 200 OK
-INFO:     127.0.0.1:60374 - "POST /prompt HTTP/1.1" 200 OK
-🔗 Context resolved: 'How complex is the first and last one compared to each other?' → 'How complex is the **[yubi-github-mcp-server](https://github.com/yubi00/yubi-github-mcp-server)** compared to the **[url-shortener](https://github.com/yubi00/url-shortener)**?'
-INFO:     127.0.0.1:45016 - "POST /prompt HTTP/1.1" 200 OK
-INFO:     127.0.0.1:57632 - "POST /prompt HTTP/1.1" 200 OK
-INFO:     127.0.0.1:42210 - "POST /prompt HTTP/1.1" 200 OK
-🔗 Context resolved: 'That blockchain one sounds cool, but what about the other blockchain thing?' → 'What about the [ethereum-dapp-boilerplate]?'
-INFO:     127.0.0.1:58458 - "POST /prompt HTTP/1.1" 200 OK
-🔗 Context resolved: 'What about it?' → 'What about the **ethereum-dapp-boilerplate**?'
-INFO:     127.0.0.1:55686 - "POST /prompt HTTP/1.1" 200 OK
-🔗 Context resolved: 'Could you compare the second and fourth projects in terms of learning value?' → 'Could you compare the **Hardhat** project and the **ReactJS** project in terms of learning value?'
-INFO:     127.0.0.1:37086 - "POST /prompt HTTP/1.1" 200 OK
+🔍 Processing: prompt='hi there', session_id='test_greeting2'
+🔍 Classification: 'hi there...' → IRRELEVANT (CHAT)
+INFO:     127.0.0.1:57718 - "POST /prompt HTTP/1.1" 200 OK
+🔍 Processing: prompt='hi there', session_id='test_greeting3'
+🔍 Classification: 'hi there...' → IRRELEVANT (CHAT)
+INFO:     127.0.0.1:36598 - "POST /prompt HTTP/1.1" 200 OK
+🔍 Processing: prompt='What projects do you have?', session_id='test_portfolio'
+🔍 Classification: 'What projects do you have?...' → RELEVANT (MCP)
+🔗 Initializing MCP connection...
+📤 Sending initialize request to http://127.0.0.1:8000/mcp
+✅ MCP initialized successfully
+   Server: github-mcp-server v1.13.0
+   Protocol: 2024-11-05
+   Capabilities: ['experimental', 'prompts', 'resources', 'tools']
+📤 Sending initialized notification...
+✅ MCP initialization complete - ready for operations
+🔧 MCP Server routing: list_repositories with portfolio context: {'type': 'owner', 'sort': 'updated', 'direction': 'desc', 'per_page': 30}
+INFO:     127.0.0.1:37938 - "POST /prompt HTTP/1.1" 200 OK
+WARNING:  StatReload detected changes in 'main_proper_mcp.py'. Reloading...
 INFO:     Shutting down
 INFO:     Waiting for application shutdown.
 INFO:     Application shutdown complete.
-INFO:     Finished server process [67541]
-INFO:     Stopping reloader process [65466]
+INFO:     Finished server process [158722]
+INFO:     Started server process [159577]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [159577]
+INFO:     Stopping reloader process [158025]

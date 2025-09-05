@@ -57,8 +57,34 @@ export default function App() {
     term.focus()
 
     let current = ''
+    let cursorPos = 0  // Track cursor position within the current input
+    
     term.onData((d) => {
-      if (d && d.charCodeAt(0) === 27) return  // ignore ESC sequences
+      // Handle specific escape sequences we want
+      if (d === '\u001b[D') { // Left arrow
+        if (cursorPos > 0) {
+          cursorPos--
+          term.write('\u001b[D')
+        }
+        return
+      }
+      
+      if (d === '\u001b[C') { // Right arrow  
+        if (cursorPos < current.length) {
+          cursorPos++
+          term.write('\u001b[C')
+        }
+        return
+      }
+      
+      if (d === '\u001b[A' || d === '\u001b[B') { // Up/Down arrows
+        return // Ignore for now
+      }
+      
+      // Block ALL other escape sequences (anything starting with ESC)
+      if (d.includes('\u001b') || d.charCodeAt(0) === 27) {
+        return
+      }
 
       if (d === '\r') {
         const trimmed = current.trim()
@@ -71,21 +97,32 @@ export default function App() {
           term.scrollToBottom()
         }
         current = ''
+        cursorPos = 0
       } else if (d === '\u0003') { // Ctrl+C
         current = ''
-        term.write('^C\r\n> ')
+        cursorPos = 0
+        term.write('^C\r\n\x1b[1m> \x1b[0m')
         term.scrollToBottom()
       } else if (d === '\u007F') { // backspace
-        if (current.length > 0) {
-          current = current.slice(0, -1)
-          term.write('\b \b')
+        if (cursorPos > 0) {
+          // Remove character at cursor position - 1
+          current = current.slice(0, cursorPos - 1) + current.slice(cursorPos)
+          cursorPos--
+          
+          // Clear from cursor to end of line, then redraw the remaining text
+          const remaining = current.slice(cursorPos)
+          term.write('\b' + remaining + ' '.repeat(1) + '\b'.repeat(remaining.length + 1))
         }
       } else {
-        if (d.includes('\u001b')) return
         const sanitized = d.replace(/\r|\n/g, '').replace(/\t/g, '  ').replace(/[^\x20-\x7E]+/g, '')
         if (sanitized.length > 0) {
-          current += sanitized
-          term.write(sanitized)
+          // Insert character at cursor position
+          current = current.slice(0, cursorPos) + sanitized + current.slice(cursorPos)
+          cursorPos += sanitized.length
+          
+          // Redraw from cursor position: write new char + remaining text, then move cursor back
+          const remaining = current.slice(cursorPos)
+          term.write(sanitized + remaining + '\u001b[D'.repeat(remaining.length))
         }
       }
     })
@@ -110,7 +147,7 @@ export default function App() {
   }
 
   const writePrompt = (term: Terminal) => {
-    term.write('> ')
+    term.write('\x1b[1m> \x1b[0m')
     term.scrollToBottom()
     term.focus()
   }
