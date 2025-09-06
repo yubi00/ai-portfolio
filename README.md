@@ -185,4 +185,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ---
 
-*This README describes the local development setup only. For remote/production MCP server deployment, see the future remote MCP project.*
+*This README describes the local development setup only. For remote/production MCP server deployment, see the future remote MCP project.*# Fresh deployment
