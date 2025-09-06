@@ -12,6 +12,7 @@ import re
 from typing import Dict, List
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 # Try to import dotenv for local development (optional)
 try:
@@ -520,11 +521,15 @@ def get_session(session_id: str):
         "history": session.get("history", [])[-10:]
     }
 
+class PromptRequest(BaseModel):
+    prompt: str
+    session_id: str = None
+
 @app.post("/prompt")
-def handle_prompt(payload: dict):
+def handle_prompt(payload: PromptRequest):
     """Complete MCP architecture with all features"""
-    prompt = payload.get("prompt", "")
-    session_id = payload.get("session_id", str(uuid.uuid4())[:8])
+    prompt = payload.prompt
+    session_id = payload.session_id or str(uuid.uuid4())[:8]
     
     print(f"🔍 Processing: prompt='{prompt}', session_id='{session_id}'")
     
