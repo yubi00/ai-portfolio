@@ -1,19 +1,16 @@
 {
-  "functions": {
-    "api/*.py": {
-      "runtime": "@vercel/python@4.1.0"
-    }
+  "build": {
+    "command": "cd client && npm ci && npm run build",
+    "publish": "client/dist"
   },
-  "rewrites": [
+  "functions": {
+    "directory": "netlify/functions"
+  },
+  "redirects": [
     {
-      "source": "/api/(.*)",
-      "destination": "/api/$1"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/client/dist/$1"
+      "from": "/*",
+      "to": "/index.html",
+      "status": 200
     }
-  ],
-  "buildCommand": "cd client && npm ci && npm run build",
-  "outputDirectory": "client/dist"
+  ]
 }

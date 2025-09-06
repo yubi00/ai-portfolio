@@ -95,4 +95,8 @@ def handle_prompt(payload: dict):
         }
 
 # Export the app for Vercel
-handler = app
+def handler(request):
+    return app(request)
+
+# Also export app directly for Vercel
+app = app
