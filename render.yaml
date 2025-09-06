@@ -11,11 +11,6 @@ services:
         sync: false  # Set this in Render dashboard
       - key: MCP_SERVER_URL
         value: https://yubi-github-mcp-server.onrender.com/mcp
-      - key: FRONTEND_URL
-        fromService:
-          type: web
-          name: ai-portfolio-frontend
-          property: url
       - key: PORT
         value: 9000
     healthCheckPath: /
@@ -23,16 +18,13 @@ services:
   # Frontend - React/Vite static site
   - type: web
     name: ai-portfolio-frontend
-    runtime: node
+    runtime: static
     plan: starter
     buildCommand: cd client && npm ci && npm run build
     staticPublishPath: ./client/dist
     envVars:
       - key: VITE_API_URL
-        fromService:
-          type: web
-          name: ai-portfolio-backend
-          property: url
+        value: https://ai-portfolio-backend.onrender.com
     headers:
       - path: /*
         name: X-Frame-Options
