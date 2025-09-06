@@ -1,9 +1,20 @@
 {
-  "_comment": "Minimal Vercel config - auto-detects api/index.py",
-  "buildCommand": "cd client && npm ci && npm run build",
-  "outputDirectory": "client/dist",
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api" },
-    { "source": "/(.*)", "destination": "/index.html" }
+  "builds": [
+    {
+      "src": "client/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "buildCommand": "npm ci && npm run build",
+        "outputDirectory": "dist"
+      }
+    },
+    {
+      "src": "api/index.py",
+      "use": "@vercel/python@4.1.0"
+    }
+  ],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/index.py" },
+    { "src": "/(.*)", "dest": "/client/dist/$1" }
   ]
 }
