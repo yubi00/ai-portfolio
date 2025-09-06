@@ -14,10 +14,9 @@ services:
         value: 9000
     healthCheckPath: /
     
-  # Frontend - React/Vite static site
-  - type: web
+  # Frontend - React/Vite static site  
+  - type: static
     name: ai-portfolio-frontend
-    runtime: static
     buildCommand: cd client && npm ci && npm run build
     staticPublishPath: ./client/dist
     envVars:
