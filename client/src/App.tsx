@@ -234,7 +234,8 @@ export default function App() {
           
           console.log('🔍 Frontend sending:', { prompt: command, sessionId, sessionIdRef: sessionIdRef.current, currentSessionId, payload })
 
-          const res = await fetch('http://127.0.0.1:9000/prompt', {
+          const apiUrl = import.meta.env?.VITE_API_URL || 'http://127.0.0.1:9000'
+          const res = await fetch(`${apiUrl}/prompt`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),

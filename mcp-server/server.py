@@ -43,7 +43,7 @@ mcp = FastMCP(
         "Authentication is handled via GITHUB_TOKEN environment variable."
     ),
     host="0.0.0.0",
-    port=8000,
+    port=int(os.getenv("PORT", 8000)),
 )
 
 # -----------------------------
@@ -249,10 +249,6 @@ def get_repository_contents(
 # Entrypoints (stdio vs HTTP)
 # -----------------------------
 if __name__ == "__main__":
-    if os.getenv("NODE_ENV") == "production":
-        print("Running in production mode, starting HTTP server...")
-        mcp.settings.stateless_http = True
-        mcp.run(transport="streamable-http")
-    else:
-        print("Running in development mode, starting stdio server...")
-        mcp.run(transport="stdio")
+    # Always run in HTTP mode for deployment
+    print("Starting MCP server in HTTP mode...")
+    mcp.run()

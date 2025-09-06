@@ -1,0 +1,53 @@
+services:
+  # MCP Client Backend - FastAPI service that processes user queries
+  - type: web  
+    name: ai-portfolio-backend
+    runtime: python3
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: python mcp-client/main.py
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false  # Set this in Render dashboard
+      - key: MCP_SERVER_URL
+        value: https://yubi-github-mcp-server.onrender.com/mcp
+      - key: FRONTEND_URL
+        fromService:
+          type: web
+          name: ai-portfolio-frontend
+          property: url
+      - key: PORT
+        value: 9000
+    healthCheckPath: /
+    
+  # Frontend - React/Vite static site
+  - type: web
+    name: ai-portfolio-frontend
+    runtime: node
+    plan: starter
+    buildCommand: cd client && npm ci && npm run build
+    staticPublishPath: ./client/dist
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: ai-portfolio-backend
+          property: url
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+# Database (if needed in future)
+# databases:
+#   - name: ai-portfolio-db
+#     databaseName: ai_portfolio
+#     user: ai_portfolio_user
+#     plan: starter

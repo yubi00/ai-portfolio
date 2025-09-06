@@ -21,9 +21,25 @@ import uvicorn
 load_dotenv()
 
 app = FastAPI(title="Proper MCP Client with Full Protocol Compliance")
+# Configure CORS for both development and production
+allowed_origins = [
+    "http://localhost:5173",  # Local development
+    "http://127.0.0.1:5173",  # Local development alternative
+]
+
+# Add production frontend URL if available
+frontend_url = os.getenv("FRONTEND_URL")
+if frontend_url:
+    allowed_origins.append(frontend_url)
+    # Also add HTTPS version if HTTP is provided
+    if frontend_url.startswith("http://"):
+        allowed_origins.append(frontend_url.replace("http://", "https://"))
+    elif frontend_url.startswith("https://"):
+        allowed_origins.append(frontend_url.replace("https://", "http://"))
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -31,7 +47,7 @@ app.add_middleware(
 
 # Configuration
 OPENAI_CLIENT = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-MCP_SERVER_URL = os.getenv("MCP_SERVER_URL", "http://127.0.0.1:8000/mcp")
+MCP_SERVER_URL = os.getenv("MCP_SERVER_URL", "https://yubi-github-mcp-server.onrender.com/mcp")
 
 # Session management (same as simplified version)
 SESSIONS: Dict[str, Dict] = {}
@@ -664,4 +680,5 @@ if __name__ == "__main__":
     else:
         print("⚠️  MCP initialization failed - server will attempt reconnection on first request")
     
-    uvicorn.run("main_proper_mcp:app", host="0.0.0.0", port=9000, reload=True)
+    port = int(os.getenv("PORT", 9000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
