@@ -9,7 +9,7 @@ import uuid
 import json
 import requests
 import re
-from typing import Dict, List
+from typing import Dict, List, Optional
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -484,27 +484,12 @@ Give a natural, helpful response that builds on our conversation."""
 
 @app.get("/")
 def root():
-    global MCP_INITIALIZED, MCP_SESSION_ID, MCP_CAPABILITIES
-    
-    if not MCP_INITIALIZED:
-        MCP_INITIALIZED = initialize_mcp_connection()
-    
     return {
         "status": "✨ Complete MCP Client - Vercel Serverless",
-        "version": "1.0.0", 
-        "features": [
-            "full_mcp_initialization", 
-            "server_side_routing", 
-            "session_management", 
-            "contextual_conversations",
-            "prompt_classification",
-            "response_summarization"
-        ],
-        "mcp_initialized": MCP_INITIALIZED,
-        "mcp_session_id": MCP_SESSION_ID,
-        "mcp_capabilities": list(MCP_CAPABILITIES.keys()) if MCP_CAPABILITIES else [],
-        "active_sessions": len(SESSIONS),
-        "openai_configured": bool(OPENAI_API_KEY)
+        "version": "1.0.0",
+        "environment": "vercel",
+        "openai_configured": bool(os.getenv("OPENAI_API_KEY")),
+        "mcp_server_url": os.getenv("MCP_SERVER_URL", "not_set")
     }
 
 @app.get("/sessions/{session_id}")
@@ -523,7 +508,7 @@ def get_session(session_id: str):
 
 class PromptRequest(BaseModel):
     prompt: str
-    session_id: str = None
+    session_id: Optional[str] = None
 
 @app.post("/prompt")
 def handle_prompt(payload: PromptRequest):
