@@ -1,6 +1,6 @@
 # AI Portfolio Terminal (Local MCP Server Setup)
 
-A terminal-style portfolio web app with a React frontend and a Python FastAPI backend, powered by a local MCP (Model Context Protocol) server for AI-driven portfolio queries. This project is **for local development and testing only**. Remote MCP server support will be provided in a separate project.
+A terminal-style portfolio web app with a Reactjs frontend and a Python FastAPI backend, powered by a local MCP (Model Context Protocol) server for AI-driven portfolio queries. This project is **for local development and testing only**. Remote MCP server support will be provided in a separate project.
 
 ---
 
