@@ -1,5 +1,4 @@
 import os
-import sys
 import uuid
 import json
 import requests
@@ -8,15 +7,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from openai import OpenAI
 
-# Add parent directory to path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+app = FastAPI(title="AI Portfolio Backend - Vercel")
 
-app = FastAPI(title="AI Portfolio Backend - Vercel Serverless")
-
-# Configure CORS for Vercel
+# Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Vercel handles CORS differently
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -29,32 +25,50 @@ MCP_SERVER_URL = os.getenv("MCP_SERVER_URL", "https://yubi-github-mcp-server.onr
 # Session management
 SESSIONS: Dict[str, Dict] = {}
 
-# Import the core functions from mcp-client
-try:
-    from mcp_client.main import (
-        initialize_mcp_connection,
-        send_mcp_request,
-        classify_prompt,
-        chat_response,
-        smart_context_resolver,
-        process_prompt_with_mcp,
-        summarize_mcp_response
-    )
-except ImportError:
-    # Fallback - copy the essential functions here if import fails
-    print("Could not import from mcp-client, using fallback functions")
+def send_mcp_request(method: str, params: dict = None) -> dict:
+    """Send a request to MCP server"""
+    payload = {
+        "jsonrpc": "2.0",
+        "method": method,
+        "params": params or {},
+        "id": str(uuid.uuid4())
+    }
+    
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json, text/event-stream"
+    }
+    
+    try:
+        response = requests.post(MCP_SERVER_URL, json=payload, headers=headers, timeout=30)
+        response.raise_for_status()
+        
+        # Handle SSE format
+        if response.text.startswith("event:"):
+            lines = [line for line in response.text.splitlines() if line.startswith("data:")]
+            if lines:
+                data = json.loads(lines[0][len("data:"):].strip())
+            else:
+                return {"error": "No data in SSE response"}
+        else:
+            data = response.json()
+            
+        return data
+        
+    except Exception as e:
+        return {"error": f"MCP request failed: {str(e)}"}
 
 @app.get("/")
 def root():
     return {
-        "status": "AI Portfolio Backend - Vercel Serverless",
+        "status": "AI Portfolio Backend - Vercel",
         "version": "1.0.0",
-        "platform": "vercel"
+        "mcp_server": MCP_SERVER_URL
     }
 
 @app.post("/prompt")
 def handle_prompt(payload: dict):
-    """Handle prompt requests - simplified for serverless"""
+    """Handle prompt requests"""
     prompt = payload.get("prompt", "")
     session_id = payload.get("session_id", str(uuid.uuid4())[:8])
     
@@ -68,14 +82,13 @@ def handle_prompt(payload: dict):
     session = SESSIONS[session_id]
     
     try:
-        # For serverless, we'll use a simplified approach
-        # Direct MCP server communication
+        # Test MCP server connection
         mcp_response = send_mcp_request("tools/list")
         
         if "error" in mcp_response:
-            reply = f"I encountered an issue: {mcp_response['error']}"
+            reply = f"I encountered an issue connecting to the MCP server: {mcp_response['error']}"
         else:
-            reply = f"Connected to MCP server successfully. Your prompt: {prompt}"
+            reply = f"Hello! I received your message: '{prompt}'. I'm successfully connected to the MCP server and can help you with questions about Yubi's portfolio!"
         
         # Update session
         session["history"].append({"user": prompt, "assistant": reply})
@@ -84,7 +97,7 @@ def handle_prompt(payload: dict):
         return {
             "reply": reply,
             "session_id": session_id,
-            "source": "vercel_serverless"
+            "source": "vercel_fastapi"
         }
         
     except Exception as e:
@@ -93,10 +106,3 @@ def handle_prompt(payload: dict):
             "session_id": session_id,
             "source": "error"
         }
-
-# Export the app for Vercel
-def handler(request):
-    return app(request)
-
-# Also export app directly for Vercel
-app = app

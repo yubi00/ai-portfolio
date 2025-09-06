@@ -1,16 +1,24 @@
 {
-  "build": {
-    "command": "cd client && npm ci && npm run build",
-    "publish": "client/dist"
-  },
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "routes": [
+    { "src": "/docs", "dest": "/api/docs" },
+    { "src": "/openapi.json", "dest": "/api/openapi.json" },
+    { "src": "/api/(.*)", "dest": "/api/$1" },
+    { "src": "/(.*)", "dest": "/client/dist/$1" }
+  ],
   "functions": {
-    "directory": "netlify/functions"
+    "api/**/*.py": {
+      "maxDuration": 60,
+      "memory": 2048
+    }
   },
-  "redirects": [
+  "builds": [
     {
-      "from": "/*",
-      "to": "/index.html",
-      "status": 200
+      "src": "client/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
     }
   ]
 }

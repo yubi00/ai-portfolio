@@ -234,7 +234,7 @@ export default function App() {
           
           console.log('🔍 Frontend sending:', { prompt: command, sessionId, sessionIdRef: sessionIdRef.current, currentSessionId, payload })
 
-          const apiUrl = import.meta.env?.VITE_API_URL || 'https://ai-portfolio-backend.onrender.com'
+          const apiUrl = import.meta.env?.VITE_API_URL || '/api'
           const res = await fetch(`${apiUrl}/prompt`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
