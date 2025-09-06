@@ -2,7 +2,7 @@ services:
   # MCP Client Backend - FastAPI service that processes user queries
   - type: web  
     name: ai-portfolio-backend
-    runtime: python3
+    runtime: python
     plan: starter
     buildCommand: pip install -r requirements.txt
     startCommand: python mcp-client/main.py
