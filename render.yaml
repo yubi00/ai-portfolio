@@ -3,7 +3,6 @@ services:
   - type: web  
     name: ai-portfolio-backend
     runtime: python
-    plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: python mcp-client/main.py
     envVars:
@@ -19,7 +18,6 @@ services:
   - type: web
     name: ai-portfolio-frontend
     runtime: static
-    plan: free
     buildCommand: cd client && npm ci && npm run build
     staticPublishPath: ./client/dist
     envVars:
