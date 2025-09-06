@@ -1,17 +1,17 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "cd client && npm ci && npm run build",
+  "buildCommand": "npm --prefix client ci && npm --prefix client run build",
   "outputDirectory": "client/dist",
-  "framework": null,
+  "rewrites": [
+    { "source": "/docs", "destination": "/api/main/docs" },
+    { "source": "/openapi.json", "destination": "/api/main/openapi.json" },
+    { "source": "/api/(.*)", "destination": "/api/main/$1" },
+    { "source": "/((?!api).*)", "destination": "/index.html" }
+  ],
   "functions": {
     "api/**/*.py": {
-      "runtime": "python3.11",
       "maxDuration": 60,
       "memory": 2048
     }
-  },
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
+  }
 }
