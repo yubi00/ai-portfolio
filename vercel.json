@@ -1,4 +1,5 @@
 {
+  "_comment": "Minimal Vercel config - auto-detects api/index.py",
   "buildCommand": "cd client && npm ci && npm run build",
   "outputDirectory": "client/dist",
   "rewrites": [
