@@ -1,0 +1,20 @@
+{
+  "functions": {
+    "api/*.py": {
+      "runtime": "python3.9"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/client/dist/$1"
+    }
+  ],
+  "buildCommand": "cd client && npm ci && npm run build",
+  "outputDirectory": "client/dist",
+  "installCommand": "pip install -r requirements.txt && cd client && npm ci"
+}
