@@ -279,8 +279,9 @@ def classify_prompt(prompt: str) -> bool:
         return True  # Default to relevant if no API key
 
     system_prompt = (
-        "You are a strict classifier. Reply with 'relevant' if the user prompt is about Yubi's personal projects, skills, experiences, or technical work. "
-        "Reply with 'irrelevant' ONLY if clearly about unrelated topics. When in doubt, classify as 'relevant'. "
+        "You are a strict classifier. Reply with 'relevant' if the user prompt is asking about Yubi's specific projects, code repositories, technical skills, or work experience. "
+        "Reply with 'irrelevant' for greetings (hello, hi), general conversation, or topics unrelated to Yubi's portfolio. "
+        "Examples: 'hello yubi' = irrelevant, 'what projects do you have' = relevant, 'tell me about Lambda-MCP-Server' = relevant. "
         "Only reply with 'relevant' or 'irrelevant'."
     )
 
@@ -322,6 +323,12 @@ def classify_prompt(prompt: str) -> bool:
 def chat_response(prompt: str) -> str:
     """Generate response for irrelevant prompts"""
     if not OPENAI_API_KEY:
+        # Check if it's a greeting
+        if any(
+            greeting in prompt.lower()
+            for greeting in ["hello", "hi", "hey", "greetings"]
+        ):
+            return "Hello! I'm Yubi's AI portfolio assistant. I'd be happy to tell you about Yubi's projects, technical skills, and experiences. What would you like to know?"
         return "I'd love to help, however I'm primarily focused on Yubi's projects, skills, and experiences! What would you like to know about the technical work?"
 
     try:
@@ -336,7 +343,7 @@ def chat_response(prompt: str) -> str:
                 "messages": [
                     {
                         "role": "system",
-                        "content": "You are Yubi's AI portfolio assistant. Politely decline non-technical questions and redirect to Yubi's projects and skills.",
+                        "content": "You are Yubi's AI portfolio assistant. For greetings, respond warmly and invite users to ask about Yubi's projects and technical work. For non-technical topics, politely redirect to Yubi's portfolio.",
                     },
                     {"role": "user", "content": prompt},
                 ],
@@ -724,7 +731,7 @@ def handle_prompt_stream(payload: PromptRequest):
                 messages = [
                     {
                         "role": "system",
-                        "content": "You are Yubi's AI portfolio assistant. Politely decline non-technical questions and redirect to Yubi's projects and skills.",
+                        "content": "You are Yubi's AI portfolio assistant. For greetings, respond warmly and invite users to ask about Yubi's projects and technical work. For non-technical topics, politely redirect to Yubi's portfolio.",
                     },
                     {"role": "user", "content": prompt},
                 ]
