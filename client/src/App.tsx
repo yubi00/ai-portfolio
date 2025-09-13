@@ -196,33 +196,11 @@ export default function App() {
         maybeHideIntroBanner()
         break
 
-      case 'session':
-        if (sessionId) {
-          term.writeln(`\x1b[32m✓ Active session: ${sessionId}\x1b[0m`)
-          term.writeln('\x1b[2m\x1b[90mContext from previous questions is remembered.\x1b[0m')
-        } else {
-          term.writeln('\x1b[33m○ No active session\x1b[0m')
-          term.writeln('\x1b[2m\x1b[90mNext question will start a new session.\x1b[0m')
-        }
-        maybeHideIntroBanner()
-        break
-
-      case 'new-session':
-        if (sessionId) {
-          term.writeln(`\x1b[2m\x1b[90m[Session ${sessionId} ended]\x1b[0m`)
-          setSessionId(null)
-          term.writeln('\x1b[32m✓ Ready for new conversation\x1b[0m')
-        } else {
-          term.writeln('\x1b[33m○ No active session to end\x1b[0m')
-        }
-        maybeHideIntroBanner()
-        break
-
       default:
         try {
           // Show thinking indicator while processing
           term.writeln('\r\n\x1b[1m\x1b[38;5;81mYubi Assistant:\x1b[0m')
-          term.writeln('\x1b[2m\x1b[90m🤔 Thinking...\x1b[0m')
+          term.writeln('\x1b[2m\x1b[90m Thinking...\x1b[0m')
           
           // Prepare request payload with session management
           const payload: { prompt: string; session_id?: string } = { prompt: command }
@@ -231,56 +209,74 @@ export default function App() {
           if (currentSessionId) {
             payload.session_id = currentSessionId
           }
-          
-          console.log('🔍 Frontend sending:', { prompt: command, sessionId, sessionIdRef: sessionIdRef.current, currentSessionId, payload })
 
-          const apiUrl = import.meta.env?.VITE_API_URL || '/api'
-          const res = await fetch(`${apiUrl}/prompt`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          })
-          if (!res.ok) {
-            // Clear thinking line and show error
-            term.write('\x1b[1A\x1b[2K') // Move up one line and clear it
-            term.writeln('\x1b[31m❌ Error: Failed to fetch from MCP client.\x1b[0m')
-          } else {
-            const data = await res.json()
-            
-            // Store session_id returned from backend
-            if (data?.session_id) {
-              console.log('🔍 Frontend received session_id:', data.session_id, 'current sessionIdRef:', sessionIdRef.current)
-              
-              // Show "Session started" only if we don't already have a session
-              if (!sessionIdRef.current) {
-                // First session created - show after clearing thinking line
-                term.write('\x1b[1A\x1b[2K') // Move up one line and clear it
-                term.writeln(`\x1b[2m\x1b[90m[Session ${data.session_id} started]\x1b[0m`)
-              } else {
-                // Subsequent conversations - just clear thinking line
-                term.write('\x1b[1A\x1b[2K') // Move up one line and clear it
+          // Try streaming endpoint first; if it works, we stop before legacy path
+          {
+            const apiUrl = (import.meta.env?.VITE_API_URL as string) || (typeof window !== 'undefined' && window.location?.port === '5173' ? 'http://127.0.0.1:9000' : '/api')
+            try {
+              const res = await fetch(`${apiUrl}/prompt/stream`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
+                body: JSON.stringify(payload),
+              })
+              if (res.ok && res.body) {
+                const reader = res.body.getReader()
+                const decoder = new TextDecoder()
+                let buffer = ''
+                let startedAnswer = false
+
+                const flushEvent = (raw: string) => {
+                  const lines = raw.split(/\r?\n/)
+                  const dataLine = lines.find(l => l.startsWith('data:'))
+                  if (!dataLine) return
+                  const jsonStr = dataLine.slice(5).trim().replace(/^\s*/, '').replace(/^:/, '')
+                  if (!jsonStr) return
+                  let evt: any
+                  try { evt = JSON.parse(jsonStr) } catch { return }
+                  const { type, payload } = evt || {}
+
+                  if (type === 'session' && payload?.session_id) {
+                    term.write('\x1b[1A\x1b[2K')
+                    if (!sessionIdRef.current) {
+                      term.writeln(`\x1b[2m\x1b[90m[Session ${payload.session_id} started]\x1b[0m`)
+                    }
+                    setSessionId(payload.session_id)
+                    sessionIdRef.current = payload.session_id
+                    if (!startedAnswer) term.writeln('\x1b[2m\x1b[90m Thinking...\x1b[0m')
+                  } else if (type === 'partial' && typeof payload?.text === 'string') {
+                    if (!startedAnswer) { term.write('\x1b[1A\x1b[2K'); startedAnswer = true }
+                    term.write(`\x1b[38;5;250m${payload.text}\x1b[0m`)
+                    term.scrollToBottom()
+                  } else if (type === 'final') {
+                    if (!startedAnswer) {
+                      term.write('\x1b[1A\x1b[2K')
+                      const reply: string = payload?.reply ?? ''
+                      term.writeln(`\x1b[38;5;250m${reply}\x1b[0m`)
+                    }
+                    term.writeln('')
+                    maybeHideIntroBanner()
+                  } else if (type === 'error') {
+                    term.write('\x1b[1A\x1b[2K')
+                    const msg = payload?.message || 'Unknown error'
+                    term.writeln(`\x1b[31mError: ${msg}\x1b[0m`)
+                  }
+                }
+
+                while (true) {
+                  const { value, done } = await reader.read()
+                  if (done) break
+                  buffer += decoder.decode(value, { stream: true })
+                  let idx: number
+                  while ((idx = buffer.indexOf('\n\n')) !== -1) {
+                    const chunk = buffer.slice(0, idx)
+                    buffer = buffer.slice(idx + 2)
+                    if (chunk.trim().length > 0) flushEvent(chunk)
+                  }
+                }
+                // Completed streaming; stop processing this command
+                break
               }
-              
-              // Always update both the state and ref from the server response
-              setSessionId(data.session_id)
-              sessionIdRef.current = data.session_id
-            } else {
-              // Clear thinking line
-              term.write('\x1b[1A\x1b[2K') // Move up one line and clear it
-            }
-
-            let answer = ''
-            if (typeof data?.result === 'string') answer = data.result
-            else if (typeof data?.reply === 'string') answer = data.reply
-            else if (typeof data === 'string') answer = data
-            else answer = JSON.stringify(data, null, 2)
-
-            // Show source indicator
-            const sourceIndicator = data?.source_indicator || '🤖'
-            
-            term.writeln(`\x1b[2m\x1b[90m${sourceIndicator}\x1b[0m`)
-            term.writeln(`\x1b[38;5;250m${answer}\x1b[0m\r\n`)
-            maybeHideIntroBanner()
+            } catch {}
           }
         } catch {
           // Clear thinking line and show error
