@@ -496,7 +496,7 @@ def determine_tool_with_context(prompt: str, tools: List[dict], context: dict) -
     ):
         return (
             "list_repositories",
-            {"type": "owner", "sort": "updated", "direction": "desc", "per_page": 30},
+            {"type": "owner", "sort": "updated", "direction": "desc", "per_page": 100},
         )
 
     elif any(word in prompt_lower for word in ["tell me about", "describe", "what is"]):
