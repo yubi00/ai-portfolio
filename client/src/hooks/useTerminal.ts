@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect } from 'react';
 import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
+import { WebLinksAddon } from '@xterm/addon-web-links';
 import { TERMINAL_CONFIG, THEMES } from '../config/terminal';
 import { writeToTerminal, writePrompt } from '../utils/terminal';
 import { type InputState, handleCommand as processCommand } from '../utils/inputHandler';
@@ -17,6 +18,7 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
   const sessionIdRef = useRef<string | null>(null); // For immediate access
   const [isLoading, setIsLoading] = useState(false);
   const [fitAddon] = useState(() => new FitAddon());
+  const [webLinksAddon] = useState(() => new WebLinksAddon());
 
   // Use ref for immediate state access to avoid React state timing issues
   const inputStateRef = useRef<InputState>({ current: '', cursorPos: 0 });
@@ -33,6 +35,7 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
 
     const term = new Terminal(TERMINAL_CONFIG);
     term.loadAddon(fitAddon);
+    term.loadAddon(webLinksAddon);
     term.open(terminalRef.current);
 
     // Use requestAnimationFrame for proper fitting like original

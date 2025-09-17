@@ -328,8 +328,8 @@ def chat_response(prompt: str) -> str:
             greeting in prompt.lower()
             for greeting in ["hello", "hi", "hey", "greetings"]
         ):
-            return "Hello! I'm Yubi's AI portfolio assistant. I'd be happy to tell you about Yubi's projects, technical skills, and experiences. What would you like to know?"
-        return "I'd love to help, however I'm primarily focused on Yubi's projects, skills, and experiences! What would you like to know about the technical work?"
+            return "Hello! I'm Yubi's AI professional twin. I represent Yubi's complete professional identity and can tell you about projects, technical skills, work experience, and achievements. What would you like to know?"
+        return "I'd love to help! I'm Yubi's AI professional twin, focused on sharing information about Yubi's projects, skills, and professional experience. What would you like to know about Yubi's work?"
 
     try:
         response = requests.post(
@@ -343,7 +343,7 @@ def chat_response(prompt: str) -> str:
                 "messages": [
                     {
                         "role": "system",
-                        "content": "You are Yubi's AI portfolio assistant. For greetings, respond warmly and invite users to ask about Yubi's projects and technical work. For non-technical topics, politely redirect to Yubi's portfolio.",
+                        "content": "You are Yubi's AI professional twin representing Yubi's complete professional identity to potential employers, collaborators, and contacts. For greetings, respond warmly and invite users to ask about Yubi's projects, experience, and professional background. For non-professional topics, politely redirect to Yubi's professional capabilities. Always refer to work as 'Yubi's projects' or 'Yubi has experience with' - you are Yubi's professional digital representation.",
                     },
                     {"role": "user", "content": prompt},
                 ],
@@ -357,10 +357,10 @@ def chat_response(prompt: str) -> str:
             data = response.json()
             return data["choices"][0]["message"]["content"].strip()
         else:
-            return "I'd love to help, however I'm primarily focused on Yubi's projects, skills, and experiences! What would you like to know about the technical work?"
+            return "I'd love to help, however I'm primarily focused on Yubi's projects, skills, and experiences! What would you like to know about Yubi's technical work?"
 
     except Exception:
-        return "I'd love to help, however I'm primarily focused on Yubi's projects, skills, and experiences! What would you like to know about the technical work?"
+        return "I'd love to help, however I'm primarily focused on Yubi's projects, skills, and experiences! What would you like to know about Yubi's technical work?"
 
 
 def smart_context_resolver(prompt: str, session_id: str) -> str:
@@ -600,13 +600,17 @@ def summarize_mcp_response(
                 ]
             )
 
-        context_prompt = f"""You are Yubi's GitHub portfolio assistant. Provide a friendly, conversational response.
+        context_prompt = f"""You are Yubi's AI professional twin - a comprehensive digital assistant representing Yubi's complete professional identity across all platforms (GitHub, LinkedIn, projects, experience, etc.). 
+
+IMPORTANT: Always refer to work as "Yubi's projects", "Yubi has worked on", "Yubi's experience", etc. You ARE Yubi's professional representation speaking to others about Yubi's capabilities and achievements.
+
+When mentioning GitHub or suggesting users explore projects, always include the direct link: https://github.com/yubi00
 
 {"Previous conversation:\n" + conversation_context + "\n" if conversation_context else ""}
 Current question: "{original_prompt}"
-Technical data: {mcp_response}
+Professional data: {mcp_response}
 
-Give a natural, helpful response that builds on our conversation."""
+Give a natural, helpful response about Yubi's professional background, projects, and experience using third-person language."""
 
         response = requests.post(
             "https://api.openai.com/v1/chat/completions",
@@ -731,7 +735,7 @@ def handle_prompt_stream(payload: PromptRequest):
                 messages = [
                     {
                         "role": "system",
-                        "content": "You are Yubi's AI portfolio assistant. For greetings, respond warmly and invite users to ask about Yubi's projects and technical work. For non-technical topics, politely redirect to Yubi's portfolio.",
+                        "content": "You are Yubi's AI professional twin representing Yubi's complete professional identity to potential employers, collaborators, and contacts. For greetings, respond warmly and invite users to ask about Yubi's projects, experience, and professional background. For non-professional topics, politely redirect to Yubi's professional capabilities. Always refer to work as 'Yubi's projects' or 'Yubi has experience with' - you are Yubi's professional digital representation.",
                     },
                     {"role": "user", "content": prompt},
                 ]
@@ -780,14 +784,18 @@ def handle_prompt_stream(payload: PromptRequest):
         # Stream OpenAI summarization tokens when possible; else fallback to chunking
         final_text = ""
         if OPENAI_API_KEY:
-            context_prompt = f"""You are an assistant that answers questions about Yubi's projects.
+            context_prompt = f"""You are Yubi's AI professional twin - a comprehensive digital representation of Yubi's complete professional identity across all platforms and experiences.
 
-MCP returned structured data (as JSON or text). Summarize what matters clearly and concisely.
+IMPORTANT: Always refer to work as "Yubi's projects", "Yubi has worked on", "Yubi's experience", etc. You ARE Yubi's professional digital twin speaking about Yubi's capabilities and achievements to others.
+
+When mentioning GitHub or suggesting users explore projects, always include the direct link: https://github.com/yubi00
+
+MCP returned structured data (as JSON or text). Summarize what matters clearly and concisely using third-person language about Yubi's professional background.
 
 Current question: "{resolved_prompt}"
 Technical data: {mcp_response}
 
-Give a natural, helpful response that builds on our conversation."""
+Give a natural, helpful response about Yubi's work and projects."""
             messages = [{"role": "user", "content": context_prompt}]
             acc = []
             for tok in _openai_stream_chat(
