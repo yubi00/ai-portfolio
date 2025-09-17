@@ -3,7 +3,7 @@ export const TERMINAL_CONFIG = {
   convertEol: true,
   fontFamily:
     'JetBrains Mono, Fira Mono, Roboto Mono, ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace',
-  fontSize: 20,
+  fontSize: 16,
   lineHeight: 1.3,
   letterSpacing: 0,
   scrollback: 1000,
