@@ -1,9 +1,18 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* CSS Reset to eliminate default margins/padding */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
 
 html, body, #root {
   height: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: #101014;
+  overflow: hidden;
 }
 
 /* xterm.js tweaks */
