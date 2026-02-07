@@ -1,5 +1,6 @@
 import { Terminal } from 'xterm'
 import { THEMES } from '../config/terminal'
+import { writePrompt } from './terminal'
 
 export interface InputState {
   current: string
@@ -47,14 +48,13 @@ export const createInputHandler = (
       if (trimmed.length > 0) {
         onCommand(trimmed)
       } else {
-        term.write('\x1b[1m> \x1b[0m')
-        term.scrollToBottom()
+        writePrompt(term)
       }
       setInputState({ current: '', cursorPos: 0 })
     } else if (data === '\u0003') { // Ctrl+C
       setInputState({ current: '', cursorPos: 0 })
-      term.write('^C\r\n\x1b[1m> \x1b[0m')
-      term.scrollToBottom()
+      term.write('^C\r\n')
+      writePrompt(term)
     } else if (data === '\u007F') { // backspace
       if (cursorPos > 0) {
         // Remove character at cursor position - 1
@@ -105,6 +105,7 @@ How to interact:
 
 Available commands:
   help         - Show this help message
+  about        - About Yubi (profile)
   clear        - Clear the terminal
   info         - Show server info
 
@@ -116,6 +117,12 @@ Advanced: Contextual Conversations
       sessionId
     };
   }
+
+  if (trimmedInput === 'about') {
+    // About is shown as a UI card overlay; keep terminal output minimal.
+    return { output: '', sessionId };
+  }
+
   
   if (trimmedInput === 'clear') {
     return {

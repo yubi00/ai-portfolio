@@ -33,12 +33,13 @@ export class AIConversationHandler extends BaseCommandHandler {
       const data = await response.json();
       
       return {
-        output: `\r\n\x1b[1m\x1b[38;5;81mYubi Assistant:\x1b[0m\n${data.reply}\n\n`,
+        // Add a blank line after the user's command to match the streaming UX.
+        output: `\r\n\r\n\x1b[38;5;250m${data.reply}\x1b[0m\n\n`,
         sessionId: data.session_id || sessionId
       };
     } catch (error) {
       return {
-        output: `\r\n\x1b[31m❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}\x1b[0m\n\n`,
+        output: `\r\n\r\n\x1b[2m\x1b[38;5;203mError: ${error instanceof Error ? error.message : 'Unknown error'}\x1b[0m\n\n`,
         sessionId
       };
     }

@@ -28,9 +28,10 @@ How to interact:
 
 Available commands:
   help         - Show this help message
+  about        - About Yubi (profile)
   clear        - Clear the terminal
   info         - Show server info
-
+ 
 Advanced: Contextual Conversations
   Ask: "Tell me your 5 projects"
   Then: "Tell me about the third one" -> Context remembered!

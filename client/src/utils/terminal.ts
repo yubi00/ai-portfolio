@@ -1,8 +1,17 @@
 import { Terminal } from 'xterm'
-import { TERMINAL_COLORS } from '../config/terminal'
+
+// Prompt style: keep it readable but low-noise. Change PROMPT_USER_COLOR to taste.
+// Good options: 245 (muted gray), 110 (soft blue), 108 (muted green), 137 (muted amber).
+const PROMPT_USER = 'yubi@yubikhadka'
+const PROMPT_USER_COLOR = 248
+// Make the prompt easy to spot: bold user + sky-blue "$" (matches cursor color).
+// Use 39m/22m to reset color/bold without resetting other terminal attributes.
+const PROMPT = `\x1b[1m\x1b[38;5;${PROMPT_USER_COLOR}m${PROMPT_USER}\x1b[39m \x1b[38;2;147;197;253m$\x1b[0m `
+const ERROR_STYLE = '\x1b[2m\x1b[38;5;203m'
+const RESET = '\x1b[0m'
 
 export const writePrompt = (term: Terminal) => {
-  term.write('\x1b[1m> \x1b[0m')
+  term.write(PROMPT)
   term.scrollToBottom()
   term.focus()
 }
@@ -32,6 +41,7 @@ export const writeHelpMessage = (term: Terminal) => {
   term.writeln('')
   term.writeln('\x1b[1mAvailable commands:\x1b[0m')
   term.writeln('  help         - Show this help message')
+  term.writeln('  about        - About Yubi (profile)')
   term.writeln('  clear        - Clear the terminal')
   term.writeln('  info         - Show server info')
   term.writeln('')
@@ -42,12 +52,11 @@ export const writeHelpMessage = (term: Terminal) => {
 
 export const writeErrorMessage = (term: Terminal, message: string) => {
   term.write('\x1b[1A\x1b[2K') // Move up one line and clear it
-  term.writeln(`\x1b[31mError: ${message}\x1b[0m`)
+  term.writeln(`${ERROR_STYLE}Error: ${message}${RESET}`)
 }
 
 export const writeThinkingMessage = (term: Terminal) => {
-  term.writeln('\r\n\x1b[1m\x1b[38;5;81mYubi Assistant:\x1b[0m')
-  term.writeln('\x1b[2m\x1b[90m🧠\x1b[0m')
+  term.scrollToBottom()
 }
 
 export const clearThinkingMessage = (term: Terminal) => {

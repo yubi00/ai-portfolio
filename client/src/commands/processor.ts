@@ -35,7 +35,7 @@ export class CommandProcessor {
 
     // Fallback (should never reach here due to AI handler being catch-all)
     return {
-      output: `\r\n\x1b[31mError: Unknown command: ${trimmedCommand}\x1b[0m\n\n`,
+      output: `\r\n\x1b[2m\x1b[38;5;203mError: Unknown command: ${trimmedCommand}\x1b[0m\n\n`,
       sessionId
     };
   }

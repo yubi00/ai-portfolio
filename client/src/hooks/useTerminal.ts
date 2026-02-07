@@ -8,6 +8,7 @@ import { type InputState, handleCommand as processCommand } from '../utils/input
 
 export interface UseTerminalOptions {
   onSessionChange?: (sessionId: string) => void;
+  onCommand?: (command: string) => void;
 }
 
 export const useTerminal = (options: UseTerminalOptions = {}) => {
@@ -85,8 +86,7 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
         if (trimmed.length > 0) {
           handleCommand(trimmed);
         } else {
-          term.write('\x1b[1m> \x1b[0m');
-          term.scrollToBottom();
+          writePrompt(term);
         }
         current = '';
         cursorPos = 0;
@@ -95,8 +95,8 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
       } else if (data === '\u0003') { // Ctrl+C
         current = '';
         cursorPos = 0;
-        term.write('^C\r\n\x1b[1m> \x1b[0m');
-        term.scrollToBottom();
+        term.write('^C\r\n');
+        writePrompt(term);
         updateInputState({ current: '', cursorPos: 0 });
       } else if (data === '\u007F') { // backspace
         if (cursorPos > 0) {
@@ -129,6 +129,7 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
     };
 
     const handleCommand = async (command: string) => {
+      options.onCommand?.(command);
       setIsLoading(true);
       try {
         const result = await processCommand(command, sessionId);
@@ -154,9 +155,13 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
     };
 
     const handleStreamingCommand = async (command: string, term: Terminal) => {
-      // Show thinking indicator while processing
-      term.writeln('\r\n\x1b[1m\x1b[38;5;81mYubi Assistant:\x1b[0m');
-      term.writeln('\x1b[2m\x1b[90m🧠\x1b[0m');
+      // Minimal: while fetching, show nothing extra (cursor blinks on the empty line).
+      // Add one blank line after the user's command so replies don't feel glued to the prompt.
+      term.writeln('');
+      term.scrollToBottom();
+      term.focus();
+
+      const ERROR_MSG = (msg: string) => `\x1b[2m\x1b[38;5;203mError: ${msg}\x1b[0m`;
       
       // Prepare request payload with session management
       const payload: { prompt: string; session_id?: string } = { prompt: command };
@@ -191,33 +196,25 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
             const { type, payload } = evt || {};
 
             if (type === 'session' && payload?.session_id) {
-              term.write('\x1b[1A\x1b[2K'); // Clear thinking line
-              if (!sessionIdRef.current) {
-                term.writeln(`\x1b[2m\x1b[90m[Session ${payload.session_id} started]\x1b[0m`);
-              }
+              // Keep it quiet: track session without printing extra lines.
               setSessionId(payload.session_id);
               sessionIdRef.current = payload.session_id;
               options.onSessionChange?.(payload.session_id);
-              if (!startedAnswer) term.writeln('\x1b[2m\x1b[90m🧠\x1b[0m');
             } else if (type === 'partial' && typeof payload?.text === 'string') {
-              if (!startedAnswer) { 
-                term.write('\x1b[1A\x1b[2K'); // Clear thinking line
-                startedAnswer = true; 
-              }
+              if (!startedAnswer) startedAnswer = true;
               term.write(`\x1b[38;5;250m${payload.text}\x1b[0m`);
               term.scrollToBottom();
             } else if (type === 'final') {
               if (!startedAnswer) {
-                term.write('\x1b[1A\x1b[2K');
                 const reply: string = payload?.reply ?? '';
                 term.writeln(`\x1b[38;5;250m${reply}\x1b[0m`);
               }
               term.writeln(''); // First line after reply
               term.writeln(''); // Extra spacing line
             } else if (type === 'error') {
-              term.write('\x1b[1A\x1b[2K');
               const msg = payload?.message || 'Unknown error';
-              term.writeln(`\x1b[31mError: ${msg}\x1b[0m`);
+              if (startedAnswer) term.writeln('');
+              term.writeln(ERROR_MSG(msg));
             }
           };
 
@@ -236,9 +233,8 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
           throw new Error(`HTTP ${res.status}`);
         }
       } catch (error) {
-        // Clear thinking line and show error
-        term.write('\x1b[1A\x1b[2K');
-        term.writeln(`\x1b[31mError: ${error instanceof Error ? error.message : 'Unknown error'}\x1b[0m`);
+        const msg = error instanceof Error ? error.message : 'Unknown error';
+        term.writeln(ERROR_MSG(msg));
       }
     };
 
