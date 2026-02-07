@@ -91,7 +91,7 @@ export const THEMES = {
    ██║   ╚██████╔╝██████╔╝██║
    ╚═╝    ╚═════╝ ╚═════╝ ╚═╝
 
-🚀  Welcome to Yubi AI Portfolio Terminal!
+🚀  Welcome to Yubi Portfolio Terminal!
 💬  Type 'help' to see available commands
 🌟  Explore my projects and experience through interactive conversation
 

@@ -156,7 +156,7 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
     const handleStreamingCommand = async (command: string, term: Terminal) => {
       // Show thinking indicator while processing
       term.writeln('\r\n\x1b[1m\x1b[38;5;81mYubi Assistant:\x1b[0m');
-      term.writeln('\x1b[2m\x1b[90mThinking...\x1b[0m');
+      term.writeln('\x1b[2m\x1b[90m🧠\x1b[0m');
       
       // Prepare request payload with session management
       const payload: { prompt: string; session_id?: string } = { prompt: command };
@@ -198,7 +198,7 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
               setSessionId(payload.session_id);
               sessionIdRef.current = payload.session_id;
               options.onSessionChange?.(payload.session_id);
-              if (!startedAnswer) term.writeln('\x1b[2m\x1b[90mThinking...\x1b[0m');
+              if (!startedAnswer) term.writeln('\x1b[2m\x1b[90m🧠\x1b[0m');
             } else if (type === 'partial' && typeof payload?.text === 'string') {
               if (!startedAnswer) { 
                 term.write('\x1b[1A\x1b[2K'); // Clear thinking line

@@ -22,11 +22,11 @@ export const clearTerminalWithIntro = (term: Terminal) => {
 }
 
 export const writeHelpMessage = (term: Terminal) => {
-  term.writeln('🤖 \x1b[1mYubi AI Portfolio Assistant\x1b[0m')
+  term.writeln('Yubi Portfolio Assistant')
   term.writeln('')
   term.writeln('\x1b[1mHow to interact:\x1b[0m')
-  term.writeln('  • Ask me about my projects, skills, or experience')
-  term.writeln('  • Examples: "What are your projects?"')
+  term.writeln('  - Ask me about my projects, skills, or experience')
+  term.writeln('  - Examples: "What are your projects?"')
   term.writeln('            "Tell me about your technical skills"')
   term.writeln('            "What programming languages do you know?"')
   term.writeln('')
@@ -34,21 +34,20 @@ export const writeHelpMessage = (term: Terminal) => {
   term.writeln('  help         - Show this help message')
   term.writeln('  clear        - Clear the terminal')
   term.writeln('  info         - Show server info')
-  term.writeln('  ping         - Test server connection')
   term.writeln('')
-  term.writeln('💬 \x1b[1mAdvanced: Contextual Conversations\x1b[0m')
+  term.writeln('\x1b[1mAdvanced: Contextual Conversations\x1b[0m')
   term.writeln('  Ask: "Tell me your 5 projects"')
-  term.writeln('  Then: "Tell me about the third one" ← Context remembered!')
+  term.writeln('  Then: "Tell me about the third one" -> Context remembered!')
 }
 
 export const writeErrorMessage = (term: Terminal, message: string) => {
   term.write('\x1b[1A\x1b[2K') // Move up one line and clear it
-  term.writeln(`\x1b[31m❌ Error: ${message}\x1b[0m`)
+  term.writeln(`\x1b[31mError: ${message}\x1b[0m`)
 }
 
 export const writeThinkingMessage = (term: Terminal) => {
   term.writeln('\r\n\x1b[1m\x1b[38;5;81mYubi Assistant:\x1b[0m')
-  term.writeln('\x1b[2m\x1b[90mThinking...\x1b[0m')
+  term.writeln('\x1b[2m\x1b[90m🧠\x1b[0m')
 }
 
 export const clearThinkingMessage = (term: Terminal) => {

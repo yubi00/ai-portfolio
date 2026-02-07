@@ -6,7 +6,7 @@ export const IntroBanner: React.FC = () => {
     <div style={TERMINAL_STYLES.banner(LAYOUT_CONSTANTS.STICKY_H)}>
       <img
         src="/banner.png"
-        alt="AI Portfolio Banner"
+        alt="Portfolio Banner"
         style={{
           width: '100%',
           height: 'auto',

@@ -1,4 +1,5 @@
 import { Terminal } from 'xterm'
+import { THEMES } from '../config/terminal'
 
 export interface InputState {
   current: string
@@ -94,11 +95,11 @@ export const handleCommand = async (input: string, sessionId: string): Promise<C
   if (trimmedInput === 'help') {
     return {
       output: `
-🤖 Yubi AI Portfolio Assistant
+Yubi Portfolio Assistant
 
 How to interact:
-  • Ask me about my projects, skills, or experience
-  • Examples: "What are your projects?"
+  - Ask me about my projects, skills, or experience
+  - Examples: "What are your projects?"
             "Tell me about your technical skills"
             "What programming languages do you know?"
 
@@ -106,11 +107,10 @@ Available commands:
   help         - Show this help message
   clear        - Clear the terminal
   info         - Show server info
-  ping         - Test server connection
 
-💬 Advanced: Contextual Conversations
+Advanced: Contextual Conversations
   Ask: "Tell me your 5 projects"
-  Then: "Tell me about the third one" ← Context remembered!
+  Then: "Tell me about the third one" -> Context remembered!
 
 `,
       sessionId
@@ -119,15 +119,18 @@ Available commands:
   
   if (trimmedInput === 'clear') {
     return {
-      output: '\x1b[2J\x1b[H', // Clear screen and move cursor to top
+      // Clear and re-print the intro so the terminal doesn't look "dead" after reset.
+      // Include ESC[3J to clear scrollback as well (prevents "double welcome").
+      output: `\x1b[H\x1b[2J\x1b[3J${THEMES.matrix.welcome}`,
       sessionId
     };
   }
   
+  // 'ping' was removed; keep this local so it doesn't trigger an API call.
   if (trimmedInput === 'ping') {
     return {
-      output: '🏓 Pong! Server is responding.\n',
-      sessionId
+      output: "Ping was removed. Use 'info' instead.\n",
+      sessionId,
     };
   }
   

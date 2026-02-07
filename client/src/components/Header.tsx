@@ -8,7 +8,7 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ sessionId }) => {
   return (
     <div style={TERMINAL_STYLES.header}>
-      <span style={{ fontWeight: 700, color: '#93c5fd' }}>Yubi AI Portfolio Terminal</span>
+      <span style={{ fontWeight: 700, color: '#93c5fd' }}>Yubi Portfolio Terminal</span>
       <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
         {sessionId && (
           <span style={{ 

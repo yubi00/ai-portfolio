@@ -2,7 +2,6 @@ import {
   BaseCommandHandler, 
   HelpCommandHandler, 
   ClearCommandHandler, 
-  PingCommandHandler, 
   InfoCommandHandler,
   CommandResult 
 } from './handlers';
@@ -15,7 +14,6 @@ export class CommandProcessor {
     this.handlers = [
       new HelpCommandHandler(),
       new ClearCommandHandler(),
-      new PingCommandHandler(),
       new InfoCommandHandler(),
       // AI handler should be last as it handles all remaining commands
       new AIConversationHandler()
@@ -37,7 +35,7 @@ export class CommandProcessor {
 
     // Fallback (should never reach here due to AI handler being catch-all)
     return {
-      output: `\r\n\x1b[31m❌ Unknown command: ${trimmedCommand}\x1b[0m\n\n`,
+      output: `\r\n\x1b[31mError: Unknown command: ${trimmedCommand}\x1b[0m\n\n`,
       sessionId
     };
   }
