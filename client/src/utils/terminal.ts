@@ -1,4 +1,4 @@
-import { Terminal } from 'xterm'
+import { Terminal } from '@xterm/xterm'
 import { getApiBaseUrl } from '../config/env'
 
 // Prompt style: keep it readable but low-noise. Change PROMPT_USER_COLOR to taste.

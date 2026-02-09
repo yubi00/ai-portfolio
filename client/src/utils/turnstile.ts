@@ -13,9 +13,12 @@ declare global {
           callback?: (token: string) => void;
           'error-callback'?: (errorCode?: string) => void;
           'expired-callback'?: () => void;
+          'before-interactive-callback'?: () => void;
+          'after-interactive-callback'?: () => void;
+          'unsupported-callback'?: () => void;
         }
       ) => string;
-      execute: (widgetIdOrContainer: string) => void;
+      execute: (widgetId: string) => void;
       reset: (widgetId: string) => void;
     };
   }
@@ -58,6 +61,12 @@ let widgetContainer: HTMLElement | null = null;
 let inflightToken: Promise<string> | null = null;
 let resolveInflight: ((token: string) => void) | null = null;
 let rejectInflight: ((err: Error) => void) | null = null;
+let interactive = false;
+
+const setContainerVisible = (visible: boolean) => {
+  if (!widgetContainer) return;
+  widgetContainer.style.display = visible ? 'block' : 'none';
+};
 
 const ensureWidget = async (): Promise<string> => {
   const { turnstileSiteKey } = getAuthEnv();
@@ -70,12 +79,14 @@ const ensureWidget = async (): Promise<string> => {
   if (!widgetContainer) {
     widgetContainer = document.createElement('div');
     widgetContainer.id = 'cf-turnstile-container';
-    // Keep it out of the way; invisible widget still needs a container.
+    // Keep it out of the way but on-screen so interactive challenges are usable.
     widgetContainer.style.position = 'fixed';
-    widgetContainer.style.left = '-10000px';
-    widgetContainer.style.top = '0';
-    widgetContainer.style.width = '1px';
-    widgetContainer.style.height = '1px';
+    widgetContainer.style.right = '16px';
+    widgetContainer.style.bottom = '16px';
+    widgetContainer.style.zIndex = '2147483647';
+    widgetContainer.style.display = 'none';
+    widgetContainer.style.width = '320px';
+    widgetContainer.style.minHeight = '80px';
     document.body.appendChild(widgetContainer);
   }
 
@@ -84,13 +95,30 @@ const ensureWidget = async (): Promise<string> => {
       sitekey: turnstileSiteKey,
       size: 'compact',
       execution: 'execute', // render now, run challenge only when we call execute()
-      appearance: 'interaction-only', // usually hidden, shows only if interaction needed
+      // Keep it quiet unless Cloudflare actually needs user interaction.
+      appearance: 'interaction-only',
+      'before-interactive-callback': () => {
+        interactive = true;
+        setContainerVisible(true);
+      },
+      'after-interactive-callback': () => {
+        interactive = false;
+        // keep visible until token resolves/rejects
+      },
+      'unsupported-callback': () => {
+        const rej = rejectInflight;
+        resolveInflight = null;
+        rejectInflight = null;
+        inflightToken = null;
+        rej?.(new Error('turnstile_unsupported'));
+      },
       callback: (token: string) => {
         // Resolve current request (if any)
         const r = resolveInflight;
         resolveInflight = null;
         rejectInflight = null;
         inflightToken = null;
+        setContainerVisible(false);
         if (r) r(token);
       },
       'expired-callback': () => {
@@ -98,6 +126,7 @@ const ensureWidget = async (): Promise<string> => {
         resolveInflight = null;
         rejectInflight = null;
         inflightToken = null;
+        setContainerVisible(false);
         if (rej) rej(new Error('turnstile_expired'));
       },
       'error-callback': (code?: string) => {
@@ -105,6 +134,7 @@ const ensureWidget = async (): Promise<string> => {
         resolveInflight = null;
         rejectInflight = null;
         inflightToken = null;
+        setContainerVisible(false);
         rej?.(new Error(code ? `turnstile_error:${code}` : 'turnstile_error'));
       },
     });
@@ -113,7 +143,7 @@ const ensureWidget = async (): Promise<string> => {
   return widgetId;
 };
 
-export const getTurnstileToken = async (timeoutMs: number = 15000): Promise<string> => {
+export const getTurnstileToken = async (timeoutMs: number = 30000): Promise<string> => {
   const { isDev, turnstileSiteKey, turnstileDevBypass } = getAuthEnv();
 
   // Dev ergonomics: allow backend TURNSTILE_BYPASS=1 by sending any token.
@@ -163,13 +193,14 @@ export const getTurnstileToken = async (timeoutMs: number = 15000): Promise<stri
       // If a previous challenge is still running/errored, reset first.
       window.turnstile.reset(id);
 
-      // Docs show execute() accepts a container selector; use the stable container id.
-      window.turnstile.execute(`#${widgetContainer.id}`);
+      // Execute the rendered widget by id.
+      window.turnstile.execute(id);
     } catch (e) {
       cleanup();
       resolveInflight = null;
       rejectInflight = null;
       inflightToken = null;
+      setContainerVisible(false);
       reject(e instanceof Error ? e : new Error('turnstile_error'));
     }
   });

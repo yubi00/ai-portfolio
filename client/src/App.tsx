@@ -3,7 +3,7 @@ import { TerminalContainer } from './components';
 import { useTerminal } from './hooks/useTerminal';
 import { TERMINAL_STYLES } from './config/terminal';
 import { AboutOverlay } from './components/AboutOverlay';
-import 'xterm/css/xterm.css';
+import '@xterm/xterm/css/xterm.css';
 import './styles.css';
 import './terminal-custom.css';
 

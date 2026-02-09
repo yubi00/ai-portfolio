@@ -1,4 +1,4 @@
-import { Terminal } from 'xterm'
+import { Terminal } from '@xterm/xterm'
 import { THEMES } from '../config/terminal'
 import { writePrompt } from './terminal'
 import { getApiBaseUrl } from '../config/env'

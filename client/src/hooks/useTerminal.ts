@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
-import { Terminal } from 'xterm';
-import { FitAddon } from 'xterm-addon-fit';
+import { Terminal } from '@xterm/xterm';
+import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { TERMINAL_CONFIG, THEMES } from '../config/terminal';
 import { writeToTerminal, writePrompt } from '../utils/terminal';
