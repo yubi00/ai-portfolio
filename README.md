@@ -1,189 +1,227 @@
-# AI Portfolio Terminal (Local MCP Server Setup)
+# Yubi Portfolio Terminal (Frontend)
 
-A terminal-style portfolio web app with a Reactjs frontend and a Python FastAPI backend, powered by a local MCP (Model Context Protocol) server for AI-driven portfolio queries. This project is **for local development and testing only**. Remote MCP server support will be provided in a separate project.
+A terminal-style portfolio UI built with React + Vite + TypeScript and rendered with xterm.js (via `@xterm/*`). The frontend talks to a separate backend API for Turnstile-based auth and prompt streaming.
 
----
+## What Users Experience
 
-## Project Overview
+- A full-screen terminal UI where the user types commands/prompts.
+- Built-in commands:
+  - `help`: prints usage and available commands.
+  - `about`: toggles the About overlay card.
+  - `clear`: clears the terminal and reprints the intro.
+  - `info`: prints the current API endpoint and session id.
+- AI responses stream in real time (SSE) with minimal UI noise.
+- While an AI stream is running, additional submissions are blocked (prevents concurrent streams and accidental spam).
 
-- **Frontend:** Terminal-inspired UI built with React, Vite, TypeScript, TailwindCSS, and xterm.js.
-- **Backend:** Python FastAPI server that bridges the frontend to a local MCP server for AI-powered portfolio and GitHub queries.
-- **MCP Server:** Local Python server (using FastMCP and PyGithub) that exposes tools for interacting with GitHub repositories and portfolio data using the Model Context Protocol (MCP).
+## Frontend Architecture
 
----
-
-## Demo
-
-![AI Portfolio Terminal Demo](client/public/banner.png)
-*Screenshot of the AI Portfolio Terminal interface*
-
----
-
-## Tech Stack
-
-- **Frontend:**
-  - React
-  - Vite
-  - TypeScript
-  - TailwindCSS
-  - xterm.js
-- **Backend:**
-  - Python 3.9+
-  - FastAPI
-  - Uvicorn
-  - OpenAI Python SDK
-  - MCP (Model Context Protocol)
-  - PyGithub
-  - python-dotenv
-  - requests
-
----
-
-## Requirements
-
-- Node.js 16+ and npm
-- Python 3.9+
-- OpenAI API key
-- GitHub personal access token with repo scope
-
----
-
-## Project Structure
+High-level flow:
 
 ```
-ai-portfolio-terminal/
-├── client/                   # React frontend
-│   ├── public/               # Static assets
-│   └── src/                  # React source code
-│       ├── App.tsx           # Main terminal UI component
-│       ├── main.tsx          # Entry point
-│       └── *.css             # Styling
-├── mcp-client/               # FastAPI backend
-│   └── main.py               # API server, handles routing to MCP
-├── mcp-server/               # Local MCP server
-│   └── server.py             # GitHub MCP tools implementation
-├── .env                      # Environment variables (create this)
-└── requirements.txt          # Python dependencies
+User -> xterm -> useTerminal hook -> /prompt/stream (SSE)
+                               -> parses SSE frames -> writes partial/final into terminal
 ```
 
----
+Key modules:
 
-## Local Development Quickstart
+- `client/src/App.tsx`
+  - Mounts the terminal container and the About overlay.
+- `client/src/hooks/useTerminal.ts`
+  - Owns xterm lifecycle (init, fit on resize, input handling).
+  - Dispatches built-in commands.
+  - For AI prompts, calls the streaming API and writes incremental output.
+  - Tracks the `session_id` emitted by SSE so conversations can be continued.
+- `client/src/utils/auth.ts`
+  - Implements the auth handshake when required:
+    - `POST /auth/session` with `{ turnstile_token }` -> returns `grant_token`.
+    - `POST /auth/token` with `Authorization: Bearer <grant_token>` -> returns `access_token`.
+  - Caches tokens in `localStorage` with expiry timestamps:
+    - `ai_portfolio.grant_token`, `ai_portfolio.grant_expires_at`
+    - `ai_portfolio.access_token`, `ai_portfolio.access_expires_at`
+- `client/src/utils/turnstile.ts`
+  - Loads Turnstile script and executes it on demand to obtain a `turnstile_token`.
+  - Uses `appearance: interaction-only`, so the widget usually stays hidden and only appears if Cloudflare requires user interaction.
+- `client/src/config/env.ts`
+  - Central place for reading env vars and computing the API base URL.
 
-### Prerequisites
-- Node.js (for frontend)
-- Python 3.9+ (for backend and MCP server)
-- `pip` (Python package manager)
+## Streaming (SSE) Behavior
 
-### 1. Install Frontend Dependencies
-```bash
+The frontend calls:
+
+- `POST /prompt/stream` with JSON `{ prompt, session_id? }`
+- Expects `text/event-stream` where each event is a `data: { ...json... }` line.
+
+The client understands these event types:
+
+- `session`: updates the current `session_id`.
+- `partial`: appends streamed text.
+- `final`: prints final text and spacing.
+- `error`: prints a terminal-styled error message.
+- `done`: end-of-stream marker.
+
+Important detail:
+- If the backend returns `401` for `/prompt/stream`, it can still return an SSE body with `{type:"error" ...}` followed by `{type:"done" ...}`. The client will parse and display that error instead of only showing `HTTP 401`.
+
+## Auth + Turnstile Flow
+
+When `VITE_REQUIRE_AUTH=true`:
+
+1. User submits a prompt.
+2. Frontend ensures it has a valid `access_token`:
+   - If needed, it runs Turnstile to obtain a `turnstile_token`.
+   - Exchanges Turnstile token for a `grant_token` (`/auth/session`).
+   - Exchanges `grant_token` for an `access_token` (`/auth/token`).
+3. Frontend calls `/prompt` or `/prompt/stream` with:
+   - `Authorization: Bearer <access_token>`
+
+Notes:
+- Seeing the `turnstile_token` in DevTools Network is expected: it is generated in the browser and must be sent to your backend for verification.
+- The backend must verify Turnstile server-side using the Turnstile secret key (never exposed to the frontend).
+
+## Auth & Security Details
+
+This frontend gates access to privileged AI endpoints (`/prompt`, `/prompt/stream`) using a short-lived token chain designed to reduce automated abuse and limit damage from token leakage.
+
+### Turnstile (bot/human gate)
+
+- Where it runs: in the user's browser (Cloudflare Turnstile widget).
+- What it produces: a `turnstile_token` (proof from Cloudflare that the browser passed its checks).
+- Where it goes next: the frontend sends it to your backend:
+  - `POST /auth/session` with JSON `{ "turnstile_token": "<token>" }`.
+- Security property: the Turnstile secret key is only on the backend. The frontend never has it.
+
+Why it matters:
+- Bots that cannot pass Turnstile cannot mint tokens, so they cannot call `/prompt*` when backend auth is enabled.
+
+### Grant token (medium-lived)
+
+- Issued by: backend after successful Turnstile verification.
+- Type: `grant` token.
+- TTL: typically ~30 minutes (per backend config).
+- Used for: exchanging to an access token:
+  - `POST /auth/token` with `Authorization: Bearer <grant_token>`.
+- Stored by frontend: cached in `localStorage` with an expiry timestamp to avoid re-running Turnstile for every prompt.
+
+Why it exists:
+- Turnstile challenges are relatively expensive and sometimes interactive; a grant token amortizes that cost across multiple prompts.
+
+### Access token (short-lived)
+
+- Issued by: backend, in exchange for a grant token.
+- Type: `access` token.
+- TTL: typically ~60 seconds (per backend config).
+- Used for: calling privileged endpoints:
+  - `POST /prompt`
+  - `POST /prompt/stream`
+  with header `Authorization: Bearer <access_token>`.
+
+Why it exists:
+- The blast radius of a leaked access token is limited by its short TTL.
+- Backend can strictly validate token type, expiry, and return precise 401 error details.
+
+### Frontend refresh logic (what actually happens)
+
+In `client/src/utils/auth.ts`:
+
+- If a valid cached `access_token` exists, use it.
+- Else if a valid cached `grant_token` exists, exchange it for a new access token.
+- Else run Turnstile to mint a new grant token, then exchange for an access token.
+
+Cached keys in `localStorage`:
+- `ai_portfolio.grant_token`, `ai_portfolio.grant_expires_at`
+- `ai_portfolio.access_token`, `ai_portfolio.access_expires_at`
+
+### SSE unauthorized behavior
+
+For `/prompt/stream`, the backend can respond with HTTP `401` while still sending an SSE body containing a normalized error frame followed by `done`. The frontend parses SSE even on non-2xx so the terminal can display the backend's error detail instead of only `HTTP 401`.
+
+### Security notes and limitations
+
+- It is expected that `turnstile_token` is visible in the browser's Network tab. It is generated in the browser and must be sent to the backend for verification.
+- The Turnstile secret key must never be exposed to the frontend. Only the site key belongs in Vercel/Vite env vars.
+- Tokens are cached in `localStorage`. If your site had an XSS vulnerability, an attacker could steal them. The primary mitigation is preventing XSS.
+- This mechanism reduces automated abuse; it does not prevent a real user from sending many prompts. Backend rate limits and concurrency caps are still required.
+
+## Environment Variables (Frontend)
+
+Vite reads `client/.env` in development. Production values are set in Vercel.
+
+Required in production:
+
+- `VITE_API_URL`: base URL of your backend API (no trailing slash). Example: `https://<render-api>`.
+- `VITE_TURNSTILE_SITE_KEY`: Cloudflare Turnstile site key.
+- `VITE_REQUIRE_AUTH`: `true` in prod once backend auth is enabled.
+- `VITE_DISABLE_AUTH`: `false` (kill switch; do not enable in prod).
+
+Optional/dev-only:
+
+- `VITE_DEV_HTTPS`: `true` runs `npm run dev` over HTTPS to reduce Turnstile/PAT console noise. Requires `@vitejs/plugin-basic-ssl`.
+- `VITE_TURNSTILE_DEV_BYPASS`: dev-only bypass for Turnstile (not recommended for real testing).
+
+See:
+- `client/.env.example`
+
+## Local Development
+
+```powershell
 cd client
 npm install
-```
-
-### 2. Install Backend & MCP Server Dependencies
-```bash
-pip install -r requirements.txt
-```
-
-### 3. Set Up Environment Variables
-Create a `.env` file in the project root with the following (see `.env.example` if available):
-```
-OPENAI_API_KEY=your-openai-api-key
-GITHUB_TOKEN=your-github-token
-```
-- `OPENAI_API_KEY` is required for AI responses.
-- `GITHUB_TOKEN` is required for GitHub MCP tools.
-
-### 4. Start the MCP Server (Local Only)
-```bash
-python3 mcp-server/server.py
-```
-- By default, runs in stdio mode for development. For HTTP mode, set `NODE_ENV=production` and it will listen on port 8000.
-
-### 5. Start the FastAPI Backend
-```bash
-python3 mcp-client/main.py
-```
-- Runs the FastAPI server on [http://localhost:9000](http://localhost:9000)
-
-### 6. Start the Frontend
-```bash
-cd client
 npm run dev
 ```
-- Runs the Vite dev server on [http://localhost:5173](http://localhost:5173)
 
----
+Default dev URL:
+- `http://localhost:5173`
 
-## Architecture
+If you want `127.0.0.1:5173` to work as well, Vite is configured to bind to `0.0.0.0` (see `client/vite.config.ts`).
 
+## Build
+
+```powershell
+cd client
+npm run build
 ```
-[Browser]
-   |
-   v
-[React + xterm.js Frontend]  <---(http)--->  [FastAPI Backend (mcp-client/main.py)]  <---(http/jsonrpc)--->  [Local MCP Server (mcp-server/server.py, Model Context Protocol)]
-```
-- The frontend sends user queries to the FastAPI backend.
-- The backend routes queries to the local MCP server, which provides AI-powered responses and GitHub data using the Model Context Protocol.
-- All components run locally for development/testing.
 
----
+Build output:
+- `client/dist/`
 
-## Usage
+## Deployment (Vercel)
 
-- Open [http://localhost:5173](http://localhost:5173) in your browser.
-- Interact with the terminal UI using natural language queries, e.g.:
-  - `What are your latest projects?`
-  - `Tell me about Lambda-MCP-Server`
-  - `Show me the code for awesome-mcp-servers`
-  - `What technologies do you use?`
-- The backend will route your query to the MCP server and return a summarized, AI-generated response.
+The repo is set up to deploy the frontend as a static site via `vercel.json`:
 
----
+- build: `cd client && npm ci && npm run build`
+- output: `client/dist`
+
+Set Vercel env vars (Production):
+- `VITE_API_URL`
+- `VITE_TURNSTILE_SITE_KEY`
+- `VITE_REQUIRE_AUTH=true`
+- `VITE_DISABLE_AUTH=false`
 
 ## Troubleshooting
 
-- **Missing API Keys:** Ensure your `.env` file contains valid `OPENAI_API_KEY` and `GITHUB_TOKEN` values.
-- **Port Conflicts:** Default ports are 5173 (frontend), 9000 (backend), and 8000 (MCP server HTTP mode). Change as needed.
-- **MCP Server Not Running:** The backend requires the MCP server to be running locally. Start it with `python3 mcp-server/server.py`.
-- **Python Version:** Use Python 3.9 or newer for best compatibility.
-- **Connection Issues:** Make sure all three services (frontend, backend, MCP server) are running simultaneously.
+- Turnstile fails locally:
+  - Make sure your Turnstile widget "Allowed hostnames" includes both `localhost` and `127.0.0.1` if you test on both.
+  - Disable ad blockers/privacy extensions for the site.
+- Console noise about `/cdn-cgi/challenge-platform/*`:
+  - This comes from Turnstile / Chrome PAT behavior and is usually cosmetic.
+  - In local dev, `client/vite.config.ts` includes middleware to return `204` for `/cdn-cgi/challenge-platform/*` to reduce noise.
+- Clear auth cache:
+  - In DevTools -> Application -> Local Storage, delete keys starting with `ai_portfolio.` to force a fresh auth flow.
 
----
+## Limitations (Current)
 
-## Roadmap / Next Steps
+- Tokens are stored in `localStorage` (not httpOnly cookies). If you ever had an XSS bug, tokens could be stolen.
+- No user-visible "auth status" UI (it's intentionally quiet). Debugging relies on DevTools.
+- No persistent command history across reloads (up/down arrow history is not implemented).
+- No multi-tab coordination (two tabs can both mint tokens/stream; the backend must enforce concurrency limits).
+- No offline mode; the UI depends on the backend for AI responses.
+- Console noise from Turnstile/PAT can still appear depending on browser/extension behavior.
 
-- [ ] Add support for remote MCP server deployments (will be a separate project/repo)
-- [ ] Enhanced portfolio data and project metadata
-- [ ] Improved terminal UX (command history, help, etc.)
-- [ ] Authentication and user profiles
-- [ ] Deployment guides for production
+## Future Enhancements
 
----
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
----
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
----
-
-## Credits
-- Built by Yubi. Powered by OpenAI, FastAPI, and MCP (Model Context Protocol).
-
----
-
-*This README describes the local development setup only. For remote/production MCP server deployment, see the future remote MCP project.*# Fresh deployment
-# Trigger deploy
+- Move tokens to secure httpOnly cookies (requires backend changes) to reduce token theft risk.
+- Add a lightweight auth indicator in the terminal (e.g., "auth ok", token refresh events) behind a dev flag.
+- Implement command history (up/down arrows) and optional persistence in `localStorage`.
+- Add a "Stop generating" interrupt for streaming responses (client abort + server cancel if supported).
+- Add multi-tab coordination (BroadcastChannel) to share tokens and avoid duplicate token minting.
+- Add better retry/backoff UX for rate limits (surface "try again in N seconds" in the terminal).
