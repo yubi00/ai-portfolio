@@ -1,4 +1,6 @@
 import { BaseCommandHandler, CommandResult } from './handlers';
+import { getApiBaseUrl, getAuthEnv } from '../config/env';
+import { getAuthorizationHeader } from '../utils/auth';
 
 export class AIConversationHandler extends BaseCommandHandler {
   canHandle(command: string): boolean {
@@ -8,26 +10,31 @@ export class AIConversationHandler extends BaseCommandHandler {
 
   async execute(command: string, sessionId: string): Promise<CommandResult> {
     try {
-      const getApiUrl = (): string => {
-        return (import.meta.env?.VITE_API_URL as string) || 
-               (typeof window !== 'undefined' && window.location?.port === '5173' 
-                 ? 'http://127.0.0.1:9000' 
-                 : '/api')
-      }
-      
-      const response = await fetch(`${getApiUrl()}/chat`, {
+      const apiUrl = getApiBaseUrl();
+      const { requireAuth } = getAuthEnv();
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      const authHeader = await getAuthorizationHeader({ enforce: requireAuth });
+      if (authHeader) headers.Authorization = authHeader;
+
+      const response = await fetch(`${apiUrl}/prompt`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({
-          message: command.trim(),
+          prompt: command.trim(),
           session_id: sessionId
         }),
       });
       
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        let detail = '';
+        try {
+          const j = await response.json();
+          detail = j?.detail ? String(j.detail) : '';
+        } catch {}
+        throw new Error(detail ? `HTTP ${response.status} (${detail})` : `HTTP ${response.status}`);
       }
       
       const data = await response.json();

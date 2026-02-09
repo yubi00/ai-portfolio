@@ -1,6 +1,7 @@
 import { Terminal } from 'xterm'
 import { THEMES } from '../config/terminal'
 import { writePrompt } from './terminal'
+import { getApiBaseUrl } from '../config/env'
 
 export interface InputState {
   current: string
@@ -142,15 +143,13 @@ Advanced: Contextual Conversations
   }
   
   if (trimmedInput === 'info') {
-    const getApiUrl = (): string => {
-      return (import.meta.env?.VITE_API_URL as string) || 'http://127.0.0.1:9000'
-    }
+    const apiUrl = getApiBaseUrl()
     
     return {
       output: `
 📊 Server Information:
   • Status: Online
-  • API Endpoint: ${getApiUrl()}
+  • API Endpoint: ${apiUrl}
   • Session ID: ${sessionId || 'Not started'}
 
 `,

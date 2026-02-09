@@ -1,4 +1,5 @@
 import { THEMES } from '../config/terminal';
+import { getApiBaseUrl } from '../config/env';
 
 export interface CommandResult {
   output: string;
@@ -61,18 +62,13 @@ export class InfoCommandHandler extends BaseCommandHandler {
   }
 
   async execute(command: string, sessionId: string): Promise<CommandResult> {
-    const getApiUrl = (): string => {
-      return (import.meta.env?.VITE_API_URL as string) || 
-             (typeof window !== 'undefined' && window.location?.port === '5173' 
-               ? 'http://127.0.0.1:9000' 
-               : '/api')
-    }
+    const apiUrl = getApiBaseUrl();
     
     return {
       output: `
 📊 Server Information:
   • Status: Online
-  • API Endpoint: ${getApiUrl()}
+  • API Endpoint: ${apiUrl}
   • Session ID: ${sessionId || 'Not started'}
 
 `,

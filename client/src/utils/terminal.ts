@@ -1,4 +1,5 @@
 import { Terminal } from 'xterm'
+import { getApiBaseUrl } from '../config/env'
 
 // Prompt style: keep it readable but low-noise. Change PROMPT_USER_COLOR to taste.
 // Good options: 245 (muted gray), 110 (soft blue), 108 (muted green), 137 (muted amber).
@@ -79,10 +80,7 @@ export const writeFinalResponse = (term: Terminal, reply: string) => {
 }
 
 export const getApiUrl = (): string => {
-  return (import.meta.env?.VITE_API_URL as string) || 
-         (typeof window !== 'undefined' && window.location?.port === '5173' 
-           ? 'http://127.0.0.1:9000' 
-           : '/api')
+  return getApiBaseUrl()
 }
 
 export const writeToTerminal = (terminal: Terminal, text: string) => {

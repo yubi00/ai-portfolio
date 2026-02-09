@@ -12,9 +12,6 @@ const App: React.FC = () => {
   const { 
     terminalRef
   } = useTerminal({
-    onSessionChange: (newSessionId) => {
-      console.log('Session changed:', newSessionId);
-    },
     onCommand: (command) => {
       const trimmed = command.trim().toLowerCase();
       if (trimmed === 'about') {

@@ -5,6 +5,8 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import { TERMINAL_CONFIG, THEMES } from '../config/terminal';
 import { writeToTerminal, writePrompt } from '../utils/terminal';
 import { type InputState, handleCommand as processCommand } from '../utils/inputHandler';
+import { getApiBaseUrl, getAuthEnv } from '../config/env';
+import { getAuthorizationHeader } from '../utils/auth';
 
 export interface UseTerminalOptions {
   onSessionChange?: (sessionId: string) => void;
@@ -51,6 +53,7 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
     // Use local variables like the original for immediate updates
     let current = '';
     let cursorPos = 0;
+    let busy = false;
 
     const handleData = (data: string) => {
       // Handle specific escape sequences we want
@@ -84,6 +87,14 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
         term.write('\r\n');
 
         if (trimmed.length > 0) {
+          if (busy) {
+            writeToTerminal(term, '\x1b[2m\x1b[38;5;244m(Please wait for the current response to finish)\x1b[0m\r\n');
+            writePrompt(term);
+            current = '';
+            cursorPos = 0;
+            updateInputState({ current: '', cursorPos: 0 });
+            return;
+          }
           handleCommand(trimmed);
         } else {
           writePrompt(term);
@@ -130,6 +141,7 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
 
     const handleCommand = async (command: string) => {
       options.onCommand?.(command);
+      busy = true;
       setIsLoading(true);
       try {
         const result = await processCommand(command, sessionId);
@@ -150,6 +162,7 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
         }
       } finally {
         setIsLoading(false);
+        busy = false;
       }
       writePrompt(term);
     };
@@ -172,18 +185,30 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
       }
 
       try {
-        const apiUrl = (import.meta.env?.VITE_API_URL as string) || 'http://127.0.0.1:9000';
+        const apiUrl = getApiBaseUrl();
+        const { requireAuth } = getAuthEnv();
+
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+          'Accept': 'text/event-stream',
+        };
+
+        const authHeader = await getAuthorizationHeader({ enforce: requireAuth });
+        if (authHeader) headers.Authorization = authHeader;
+
         const res = await fetch(`${apiUrl}/prompt/stream`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
+          headers,
           body: JSON.stringify(payload),
         });
 
-        if (res.ok && res.body) {
+        // /prompt/stream may return 401 while still sending an SSE error frame.
+        if (res.body) {
           const reader = res.body.getReader();
           const decoder = new TextDecoder();
           let buffer = '';
           let startedAnswer = false;
+          let sawDone = false;
 
           const flushEvent = (raw: string) => {
             const lines = raw.split(/\r?\n/);
@@ -213,8 +238,13 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
               term.writeln(''); // Extra spacing line
             } else if (type === 'error') {
               const msg = payload?.message || 'Unknown error';
+              const detail = payload?.detail ? ` (${payload.detail})` : '';
               if (startedAnswer) term.writeln('');
-              term.writeln(ERROR_MSG(msg));
+              term.writeln(ERROR_MSG(`${msg}${detail}`));
+            }
+
+            if (type === 'done') {
+              sawDone = true;
             }
           };
 
@@ -228,6 +258,11 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
               buffer = buffer.slice(idx + 2);
               if (chunk.trim().length > 0) flushEvent(chunk);
             }
+          }
+
+          // If backend returned a non-2xx without emitting an SSE error, surface status.
+          if (!res.ok && !sawDone) {
+            term.writeln(ERROR_MSG(`HTTP ${res.status}`));
           }
         } else {
           throw new Error(`HTTP ${res.status}`);
