@@ -186,6 +186,8 @@ AFTER:   LLM decides → which portfolio question to answer → MCP Server → F
 - **Mobile-responsive font size** — 13px below 640px viewport, updates on orientation change
 - **Tab title** — updated to `yubi.ai`
 - **Word wrap fix** — terminal fits after fonts load to ensure correct column count
+- **`useTerminal` refactor** — god file split into `useTerminal` (orchestration), `useTerminalInput` (keyboard/input handling), and `useStreamingResponse` (SSE streaming + status animation)
+- **Terminal viewport bottom padding** — added `padding-bottom: 24px` to `.xterm-viewport` so the prompt isn't flush against the bottom edge after a response
 
 ### 4.4 Observability — Structured Logging & Centralized Log Store (Priority: Medium)
 

@@ -24,6 +24,11 @@
   position: relative;
 }
 
+.xterm .xterm-viewport {
+  padding-bottom: 24px !important;
+  box-sizing: content-box !important;
+}
+
 .xterm .xterm-viewport::-webkit-scrollbar-thumb {
   background: #23232a;
 }
