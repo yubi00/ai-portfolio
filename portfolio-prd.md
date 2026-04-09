@@ -465,16 +465,89 @@ The current system makes several expensive calls on every request. Caching at mu
 
 ### Parallel Multi-Tool Calls
 
-**Problem:** The current pipeline calls exactly one tool per request — whichever `gpt-4o` selects via `call_with_tools`. For questions that span multiple data sources (e.g. "does Yubi have AI skills?"), a single tool is insufficient. `get_projects` covers GitHub projects but misses work-place AI projects that exist only in the resume (e.g. Conor AI, NLP agents built at a previous employer). `query_resume` covers the resume but misses live project detail.
+**Status: Next up — to be implemented in `yubi-ai-portfolio-api`**
 
-**What Claude Code does differently:** Claude's tool-calling can invoke multiple tools in parallel in a single pass — `get_projects` + `query_resume` simultaneously — and synthesise the combined results. This produces substantially richer answers for cross-domain questions.
+**Problem:** The current pipeline calls exactly one tool per request — whichever `gpt-4o` selects via `call_with_tools`. For questions that span multiple data sources (e.g. "what AI experience does Yubi have?"), a single tool produces an incomplete answer. `get_projects` covers GitHub projects but misses workplace AI work that only exists in the resume (`query_resume`). `query_resume` covers the resume but misses live project detail. The LLM has to pick one and the answer is always partial.
 
-**Proposed approach:** OpenAI's `/v1/chat/completions` already supports returning multiple `tool_calls` in a single response. The change needed:
-1. `call_with_tools` — instead of taking the first `tool_call`, collect all `tool_calls` from the response
-2. Execute all chosen tools via `send_mcp_request("tools/call", ...)` in parallel (or sequentially)
-3. Merge the text content from all results before passing to the summarizer
+**Root cause (confirmed via code review):**
 
-**Why not now:** Requires changes to `call_with_tools`, `_process_with_mcp_tools`, and the summarizer's context assembly. Low risk but non-trivial. Deferred until the 4-tool set stabilises after `get_skills` removal.
+In `app/services/openai_client.py`:
+```python
+if message.get("tool_calls"):
+    tool_call = message["tool_calls"][0]  # only first call used — rest discarded
+```
+
+OpenAI already returns all the tool calls the LLM wants to make — we just discard everything after the first.
+
+**Proposed implementation — 3 files:**
+
+**1. `app/services/openai_client.py` → `call_with_tools()`**
+- Return all tool calls, not just `[0]`
+- Change return type from `{"tool_name": str, "tool_args": dict}` to `{"tool_calls": [{"name": str, "args": dict}, ...]}`
+
+**2. `app/services/prompt_processing.py` → `_process_with_mcp_tools()`**
+- Handle the new list return from `call_with_tools`
+- Execute all tool calls in parallel using `concurrent.futures.ThreadPoolExecutor` (keeps the sync HTTP transport, no async refactor needed)
+- Merge all text results into a single combined context block before passing to the summarizer
+- Graceful partial failure: if one tool errors, include the others and note the failure
+
+**3. `app/prompts/templates.py` → summarizer system prompt**
+- Update `_SUMMARIZE_SYSTEM` to handle multi-tool context (currently assumes single tool result)
+- Format: each tool result labelled by source so the LLM can synthesise clearly
+
+**Execution strategy:**
+```python
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+with ThreadPoolExecutor() as executor:
+    futures = {
+        executor.submit(send_mcp_request, "tools/call", {"name": tc["name"], "arguments": tc["args"]}): tc["name"]
+        for tc in tool_calls
+    }
+    results = {}
+    for future in as_completed(futures):
+        tool_name = futures[future]
+        try:
+            results[tool_name] = future.result()
+        except Exception as e:
+            results[tool_name] = f"[Error: {e}]"
+```
+
+**Impact:** Cross-domain questions ("what AI experience does Yubi have?", "tell me about Yubi's skills and projects") get answers synthesised from multiple sources in a single response, with no extra round-trips.
+
+---
+
+### Prompt Caching
+
+**Status: Next up (after parallel tool calls) — to be implemented in `yubi-ai-portfolio-api`**
+
+**How OpenAI prompt caching works:** OpenAI automatically caches prompt prefixes ≥1024 tokens and applies a 50% token discount on cache hits. No code opt-in required — it activates automatically based on prefix stability. The cache key is the exact token sequence of the prefix.
+
+**Current state (confirmed via code review):**
+
+`call_with_tools()` message order:
+```python
+messages = [system_prompt] + session_history[-4:] + [user_message]
+```
+
+The `PORTFOLIO_SYSTEM_PROMPT` is first (good), but session history sits between it and the user message, meaning the cached prefix only covers the system prompt. Tool schemas are included in the system prompt itself, so they are cached if the system prompt is stable.
+
+**Potential cache-busting issue to verify:** Check whether `PORTFOLIO_SYSTEM_PROMPT` is built dynamically (e.g. f-string with timestamps, request IDs, or other per-request values). If so, the prefix changes every request and nothing is cached.
+
+**Recommended changes:**
+
+1. **Verify `templates.py`** — ensure `PORTFOLIO_SYSTEM_PROMPT` is a static string constant, not built at request time. Any dynamic values must go in the user message or a separate system message appended after the static prefix.
+
+2. **Verify `_SUMMARIZE_SYSTEM`** — same check. The summarizer system prompt should be fully static.
+
+3. **Message ordering for summarizer** in `build_summarize_messages()`:
+   - Current order: `[summarize_system] + session_history + [user_message + tool_results]`
+   - This is already correct for caching — static system prompt first, variable content last.
+   - Confirm tool results are appended to the user message (not inserted between system and history), otherwise they break the cached prefix.
+
+4. **Do NOT prepend** request IDs, timestamps, or per-session values to system prompts — this busts the cache on every request.
+
+**Expected savings:** ~50% token cost on `PORTFOLIO_SYSTEM_PROMPT` + tool schema tokens for every request. At `gpt-4o` pricing, tool schemas alone are ~500 tokens — meaningful at scale, and the habit of structured prompt ordering is worth building now.
 
 ---
 
