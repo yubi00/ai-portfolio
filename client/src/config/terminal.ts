@@ -1,6 +1,6 @@
 export const MOBILE_BREAKPOINT = 640
-export const DESKTOP_FONT_SIZE = 17
-export const MOBILE_FONT_SIZE = 13
+export const DESKTOP_FONT_SIZE = 14
+export const MOBILE_FONT_SIZE = 11
 
 // ---------------------------------------------------------------------------
 // xterm.js themes
