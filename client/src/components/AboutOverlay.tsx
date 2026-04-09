@@ -151,6 +151,17 @@ export const AboutOverlay: React.FC<AboutOverlayProps> = ({ visible, onClose }) 
                   github.com/yubi00
                 </a>
               </div>
+              <div>
+                <span style={{ opacity: dimText }}>LinkedIn:</span>{' '}
+                <a
+                  href="https://linkedin.com/in/ubrajkhadka"
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ color: primary, textDecoration: 'none' }}
+                >
+                  linkedin.com/in/ubrajkhadka
+                </a>
+              </div>
             </div>
           </div>
         </div>

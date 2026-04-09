@@ -175,7 +175,7 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
       busy = true;
       setIsLoading(true);
       try {
-        const result = await processCommand(command, sessionId);
+        const result = await processCommand(command, sessionId ?? '');
         if (result.output) {
           writeToTerminal(term, result.output);
         }
@@ -199,15 +199,46 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
     };
 
     const handleStreamingCommand = async (command: string, term: Terminal) => {
-      // One blank line after the user's prompt so the reply doesn't feel glued to it.
       term.writeln('');
       term.scrollToBottom();
       term.focus();
 
-      // Cursor blinks naturally on the empty line — no animation needed
-      const clearAnimation = () => {}
+      // Animated status line — cycles dots on the same line, hidden cursor during animation
+      const STATUS_COLOR = '\x1b[2m\x1b[38;5;244m'
+      const STATUS_RESET = '\x1b[0m'
+      const DOTS = ['   ', '.  ', '.. ', '...']
+      let dotFrame = 0
+      let currentLabel = 'thinking'
+      let dotInterval: ReturnType<typeof setInterval> | null = null
+      let statusActive = false
+
+      const startStatusAnimation = (label: string) => {
+        currentLabel = label
+        if (!statusActive) {
+          statusActive = true
+          term.write('\x1b[?25l') // hide cursor during animation
+        }
+        if (!dotInterval) {
+          dotInterval = setInterval(() => {
+            dotFrame = (dotFrame + 1) % DOTS.length
+            term.write(`\r\x1b[2K${STATUS_COLOR}⟳ ${currentLabel}${DOTS[dotFrame]}${STATUS_RESET}`)
+          }, 200)
+        }
+      }
+
+      const clearAnimation = () => {
+        if (dotInterval) { clearInterval(dotInterval); dotInterval = null }
+        if (statusActive) {
+          term.write('\r\x1b[2K') // erase status line
+          term.write('\x1b[?25h') // restore cursor
+          statusActive = false
+        }
+      }
 
       const ERROR_MSG = (msg: string) => `\x1b[2m\x1b[38;5;203mError: ${msg}\x1b[0m`;
+
+      // Start animation immediately — no blank cursor wait before first SSE event
+      startStatusAnimation('thinking');
 
       // Prepare request payload with session management
       const payload: { prompt: string; session_id?: string } = { prompt: command };
@@ -260,6 +291,19 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
               setSessionId(payload.session_id);
               sessionIdRef.current = payload.session_id;
               options.onSessionChange?.(payload.session_id);
+            } else if (type === 'status') {
+              if (!startedAnswer) {
+                const labels: Record<string, string> = {
+                  resolving_context: 'understanding context',
+                  summarizing: 'composing reply',
+                  friendly_chat: 'thinking',
+                };
+                startStatusAnimation(labels[payload?.phase] ?? 'thinking');
+              }
+            } else if (type === 'classification') {
+              if (!startedAnswer && payload?.relevant) {
+                startStatusAnimation('searching portfolio');
+              }
             } else if (type === 'partial' && typeof payload?.text === 'string') {
               if (!startedAnswer) {
                 clearAnimation();
