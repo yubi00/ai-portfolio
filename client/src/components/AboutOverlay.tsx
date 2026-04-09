@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { TERMINAL_COLORS } from '../config/terminal';
+import { useTheme } from '../context/ThemeContext';
 
 interface AboutOverlayProps {
   visible: boolean;
@@ -7,11 +7,11 @@ interface AboutOverlayProps {
 }
 
 export const AboutOverlay: React.FC<AboutOverlayProps> = ({ visible, onClose }) => {
+  const { isDark } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [isNarrow, setIsNarrow] = useState(false);
   const cardRef = useRef<HTMLDivElement | null>(null);
 
-  // Avoid a flash on initial load; only mount after first paint.
   useEffect(() => {
     const t = window.setTimeout(() => setMounted(true), 0);
     return () => window.clearTimeout(t);
@@ -26,11 +26,18 @@ export const AboutOverlay: React.FC<AboutOverlayProps> = ({ visible, onClose }) 
 
   useEffect(() => {
     if (!mounted || !visible) return;
-    // Move focus away from xterm so Esc works without clicking the modal first.
     window.setTimeout(() => cardRef.current?.focus(), 0);
   }, [mounted, visible]);
 
   if (!mounted || !visible) return null;
+
+  const cardBg     = isDark ? 'rgba(16,16,20,0.92)'    : 'rgba(255,255,255,0.95)';
+  const border     = isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)';
+  const textColor  = isDark ? '#b0b3b8' : '#1e293b';
+  const primary    = isDark ? '#93c5fd' : '#2563eb';
+  const dimText    = isDark ? 0.75 : 0.55;
+  const divider    = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)';
+  const btnBorder  = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)';
 
   return (
     <div
@@ -42,7 +49,7 @@ export const AboutOverlay: React.FC<AboutOverlayProps> = ({ visible, onClose }) 
         position: 'fixed',
         inset: 0,
         zIndex: 20,
-        background: 'rgba(0,0,0,0.35)',
+        background: isDark ? 'rgba(0,0,0,0.40)' : 'rgba(0,0,0,0.20)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -57,18 +64,34 @@ export const AboutOverlay: React.FC<AboutOverlayProps> = ({ visible, onClose }) 
           width: 'min(980px, calc(100vw - 32px))',
           maxHeight: 'min(78vh, 760px)',
           borderRadius: 14,
-          border: '1px solid rgba(255,255,255,0.08)',
-          background: 'rgba(16,16,20,0.88)',
+          border,
+          background: cardBg,
           backdropFilter: 'blur(12px)',
-          boxShadow: '0 18px 60px rgba(0,0,0,0.55)',
+          boxShadow: isDark
+            ? '0 18px 60px rgba(0,0,0,0.55)'
+            : '0 8px 40px rgba(0,0,0,0.12)',
           overflow: 'hidden',
-          color: TERMINAL_COLORS.text,
+          color: textColor,
           fontFamily:
             'JetBrains Mono, Fira Mono, Roboto Mono, ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace',
           outline: 'none',
         }}
       >
-        <AboutOverlayHeader onClose={onClose} />
+        {/* Header */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '12px 14px',
+            borderBottom: `1px solid ${divider}`,
+          }}
+        >
+          <div style={{ fontWeight: 800, letterSpacing: 0.2 }}>About</div>
+          <AboutCloseButton onClose={onClose} isDark={isDark} btnBorder={btnBorder} textColor={textColor} />
+        </div>
+
+        {/* Body */}
         <div
           style={{
             display: 'grid',
@@ -86,8 +109,8 @@ export const AboutOverlay: React.FC<AboutOverlayProps> = ({ visible, onClose }) 
               height: 'auto',
               display: 'block',
               borderRadius: 12,
-              border: '1px solid rgba(255,255,255,0.06)',
-              filter: 'brightness(0.95) contrast(1.05)',
+              border: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.06)',
+              filter: isDark ? 'brightness(0.95) contrast(1.05)' : 'none',
               alignSelf: 'start',
             }}
           />
@@ -104,26 +127,26 @@ export const AboutOverlay: React.FC<AboutOverlayProps> = ({ visible, onClose }) 
             </p>
             <div style={{ height: 14 }} />
             <div style={{ opacity: 0.9 }}>
-              <div style={{ fontWeight: 700, color: TERMINAL_COLORS.primary }}>Links</div>
+              <div style={{ fontWeight: 700, color: primary }}>Links</div>
               <div style={{ height: 8 }} />
               <div>
-                <span style={{ opacity: 0.75 }}>Portfolio:</span>{' '}
+                <span style={{ opacity: dimText }}>Portfolio:</span>{' '}
                 <a
                   href="https://yubikhadka.com"
                   target="_blank"
                   rel="noreferrer"
-                  style={{ color: TERMINAL_COLORS.primary, textDecoration: 'none' }}
+                  style={{ color: primary, textDecoration: 'none' }}
                 >
                   yubikhadka.com
                 </a>
               </div>
               <div>
-                <span style={{ opacity: 0.75 }}>GitHub:</span>{' '}
+                <span style={{ opacity: dimText }}>GitHub:</span>{' '}
                 <a
                   href="https://github.com/yubi00"
                   target="_blank"
                   rel="noreferrer"
-                  style={{ color: TERMINAL_COLORS.primary, textDecoration: 'none' }}
+                  style={{ color: primary, textDecoration: 'none' }}
                 >
                   github.com/yubi00
                 </a>
@@ -136,12 +159,16 @@ export const AboutOverlay: React.FC<AboutOverlayProps> = ({ visible, onClose }) 
   );
 };
 
-const AboutOverlayHeader: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+const AboutCloseButton: React.FC<{
+  onClose: () => void;
+  isDark: boolean;
+  btnBorder: string;
+  textColor: string;
+}> = ({ onClose, isDark, btnBorder, textColor }) => {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
-    // Use capture because xterm may stop propagation on key events.
     window.addEventListener('keydown', onKeyDown, { capture: true });
     document.addEventListener('keydown', onKeyDown, { capture: true });
     return () => {
@@ -151,33 +178,22 @@ const AboutOverlayHeader: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   }, [onClose]);
 
   return (
-    <div
+    <button
+      type="button"
+      onClick={onClose}
       style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '12px 14px',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
+        background: 'transparent',
+        color: textColor,
+        border: `1px solid ${btnBorder}`,
+        borderRadius: 10,
+        padding: '6px 10px',
+        fontFamily: 'inherit',
+        fontSize: 12,
+        cursor: 'pointer',
+        opacity: isDark ? 0.85 : 0.7,
       }}
     >
-      <div style={{ fontWeight: 800, letterSpacing: 0.2 }}>About</div>
-      <button
-        type="button"
-        onClick={onClose}
-        style={{
-          background: 'transparent',
-          color: TERMINAL_COLORS.text,
-          border: '1px solid rgba(255,255,255,0.10)',
-          borderRadius: 10,
-          padding: '6px 10px',
-          fontFamily: 'inherit',
-          fontSize: 12,
-          cursor: 'pointer',
-          opacity: 0.85,
-        }}
-      >
-        Esc
-      </button>
-    </div>
+      Esc
+    </button>
   );
 };

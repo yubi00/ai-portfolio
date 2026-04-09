@@ -23,6 +23,12 @@ Tracks UI improvements and cleanup tasks per PRD section 4.3.
 
 ---
 
+## Upcoming
+
+- [x] **Light / dark theme toggle** — Sun/Moon icon button in the header; dark = original dark terminal, light = Solarized Light (cream bg, cyan accent, dark gray text — 3 colours mirroring dark); xterm 256-colour palette correctly remapped; card border/shadow adapts; preference persisted in localStorage; About overlay theme-aware
+
+---
+
 ## Verification Checklist
 
 - [ ] `cd client && npm run build` passes with no TS errors
