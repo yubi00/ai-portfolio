@@ -171,21 +171,21 @@ AFTER:   LLM decides → which portfolio question to answer → MCP Server → F
 
 **Decision:** Deferred — will evaluate when starting this workstream. Leaning toward pgvector (Neon) for simplicity or Pinecone for the learning experience.
 
-### 4.3 UI Improvements (Priority: Low)
+### 4.3 UI Improvements (Priority: Low) ✅ Complete
 
 **Objective:** Small visual polish to the terminal interface.
 
-**Tasks (to be scoped):**
+**Delivered:**
 
-- Review current terminal UI and identify quick wins
-- Potential improvements:
-  - **Rebrand terminal prompt:** `yubi@agent:~$` → `yubi@khadka:~$` — removes the inaccurate "agent" label, reads as a natural terminal prompt (user@host), and is simply Yubi's name
-  - Loading/typing animations
-  - Better mobile responsiveness
-  - Syntax highlighting for code blocks in responses
-  - Add resume download link / command
-  - Improve welcome message / help command output
-- No major redesign — keep the terminal aesthetic
+- **Prompt rebranded** — `yubi@agent:~$` → `yubi@yubikhadka $` (natural user@host format, no inaccurate "agent" label)
+- **Welcome message** — clean ASCII banner in sky-blue ANSI, short tagline, no emojis
+- **Help output** — minimal layout, ANSI section headers, third-person example queries
+- **Resume command** — `resume` opens `resume.pdf` in a new tab via `window.open` (no browser popup)
+- **Code block syntax highlighting** — streaming-safe; fenced blocks in green, inline code in cyan
+- **Dark / light theme toggle** — Sun/Moon icon button top-right; dark = original, light = Solarized Light (cream bg, cyan accent, 3-colour palette mirroring dark); persisted in `localStorage`
+- **Mobile-responsive font size** — 13px below 640px viewport, updates on orientation change
+- **Tab title** — updated to `yubi.ai`
+- **Word wrap fix** — terminal fits after fonts load to ensure correct column count
 
 ### 4.4 Observability — Structured Logging & Centralized Log Store (Priority: Medium)
 
@@ -333,7 +333,7 @@ FastAPI backend is currently on Render's paid Starter plan. Goal is to move to f
 2. **Observability** — Structured JSON logging is in the MCP server (Bite 1). Cross-service `request_id` correlation and Grafana Cloud Loki integration to be added when FastAPI backend is built.
 3. **FastAPI Backend** — Build service layer; expose endpoints the MCP server will delegate to. Move GitHub API calls from MCP → FastAPI. Implement RAG pipeline (`query_resume`, `get_work_history`).
 4. **RAG Integration** — Resume ingestion, vector store, retrieval pipeline. Powers `query_resume` and `get_work_history`. Optionally add LinkedIn web fetch.
-5. **UI Improvements** — Polish last.
+5. **UI Improvements** — ✅ Complete. See 4.3.
 
 > **Note on ordering:** Observability is listed as step 2 but should be implemented *alongside*, not after. Structured logging is already in the MCP server. Full cross-service correlation will be added when the FastAPI backend is built.
 

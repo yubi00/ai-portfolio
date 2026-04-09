@@ -55,10 +55,26 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
     term.loadAddon(webLinksAddon);
     term.open(terminalRef.current);
 
-    // Use requestAnimationFrame for proper fitting like original
+    // Fit immediately so the terminal has a usable size right away.
+    // Then fit again once fonts are ready — JetBrains Mono loads async, and the
+    // first fit may use fallback font metrics (narrower chars → too many columns
+    // → lines overflow). The second fit corrects the column count once the real
+    // char width is known. We guard with a flag so this only fires once on init,
+    // not mid-session (which would corrupt xterm's cursor state).
+    let fontFitDone = false
     requestAnimationFrame(() => {
-      fitAddon.fit();
-    });
+      try { fitAddon.fit() } catch {}
+    })
+    if (document.fonts?.ready) {
+      document.fonts.ready.then(() => {
+        if (!fontFitDone) {
+          fontFitDone = true
+          requestAnimationFrame(() => {
+            try { fitAddon.fit() } catch {}
+          })
+        }
+      })
+    }
 
     // Write welcome message
     writeToTerminal(term, THEMES.matrix.welcome);
@@ -70,6 +86,7 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
     let busy = false;
 
     const handleData = (data: string) => {
+      fontFitDone = true // prevent any late font-load fit from firing mid-session
       // Handle specific escape sequences we want
       if (data === '\u001b[D') { // Left arrow
         if (cursorPos > 0) {
@@ -187,32 +204,8 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
       term.scrollToBottom();
       term.focus();
 
-      // --- Animated "thinking" dots while waiting for the first token ---
-      const DOT_FRAMES = ['·', '· ·', '· · ·']
-      const DOT_COLOR  = '\x1b[38;5;244m'
-      const DOT_RESET  = '\x1b[0m'
-      let dotFrame = 0
-      let animationStarted = false
-
-      // Write the first frame on a new line so we have a line to overwrite
-      term.writeln(`${DOT_COLOR}${DOT_FRAMES[0]}${DOT_RESET}`)
-      animationStarted = true
-
-      const dotInterval = setInterval(() => {
-        dotFrame = (dotFrame + 1) % DOT_FRAMES.length
-        // Overwrite the current animation line in place
-        term.write(`\x1b[1A\x1b[2K\r${DOT_COLOR}${DOT_FRAMES[dotFrame]}${DOT_RESET}\r\n`)
-        term.scrollToBottom()
-      }, 400)
-
-      const clearAnimation = () => {
-        clearInterval(dotInterval)
-        if (animationStarted) {
-          // Erase the animation line
-          term.write('\x1b[1A\x1b[2K\r')
-          animationStarted = false
-        }
-      }
+      // Cursor blinks naturally on the empty line — no animation needed
+      const clearAnimation = () => {}
 
       const ERROR_MSG = (msg: string) => `\x1b[2m\x1b[38;5;203mError: ${msg}\x1b[0m`;
 

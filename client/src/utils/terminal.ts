@@ -45,9 +45,9 @@ export const writeHelpMessage = (term: Terminal) => {
   term.writeln(`  ${B}clear${R}   ${D}—${R} clear the terminal`)
   term.writeln('')
   term.writeln(`${B}Ask me anything:${R}`)
-  term.writeln(`  ${D}"What projects have you built?"${R}`)
-  term.writeln(`  ${D}"What's your experience with AI?"${R}`)
-  term.writeln(`  ${D}"Tell me about your background"${R}`)
+  term.writeln(`  ${D}"What has Yubi built?"${R}`)
+  term.writeln(`  ${D}"What's Yubi's experience with AI?"${R}`)
+  term.writeln(`  ${D}"Tell me about Yubi's background"${R}`)
 }
 
 export const writeErrorMessage = (term: Terminal, message: string) => {

@@ -23,7 +23,7 @@ export class HelpCommandHandler extends BaseCommandHandler {
     const S = '\x1b[38;5;238m'  // dim separator
 
     return {
-      output: `\r\n${B}Commands${R}  ${S}${'─'.repeat(28)}${R}\r\n  ${B}help${R}    ${D}—${R} show this message\r\n  ${B}about${R}   ${D}—${R} profile and links\r\n  ${B}resume${R}  ${D}—${R} download resume\r\n  ${B}clear${R}   ${D}—${R} clear the terminal\r\n\r\n${B}Ask me anything:${R}\r\n  ${D}"What projects have you built?"\r\n  "What's your experience with AI?"\r\n  "Tell me about your background"${R}\r\n\r\n`,
+      output: `\r\n${B}Commands${R}  ${S}${'─'.repeat(28)}${R}\r\n  ${B}help${R}    ${D}—${R} show this message\r\n  ${B}about${R}   ${D}—${R} profile and links\r\n  ${B}resume${R}  ${D}—${R} download resume\r\n  ${B}clear${R}   ${D}—${R} clear the terminal\r\n\r\n${B}Ask me anything:${R}\r\n  ${D}"What has Yubi built?"\r\n  "What's Yubi's experience with AI?"\r\n  "Tell me about Yubi's background"${R}\r\n\r\n`,
       sessionId
     };
   }

@@ -72,3 +72,8 @@ Browser (xterm.js)
 ```
 
 AI responses stream token-by-token via SSE. Code blocks in responses are syntax-highlighted in the terminal.
+
+## UI
+
+- **Dark / light theme** — toggle in the top-right corner (Sun/Moon icon); preference persisted in `localStorage`. Light theme uses Solarized Light palette (cream background, cyan accent).
+- **Resume** — `resume.pdf` served from `client/public/`; opened directly in a new tab via the `resume` command.
