@@ -17,27 +17,13 @@ export class HelpCommandHandler extends BaseCommandHandler {
   }
 
   async execute(command: string, sessionId: string): Promise<CommandResult> {
+    const B = '\x1b[1m'
+    const R = '\x1b[0m'
+    const D = '\x1b[38;5;244m'
+    const S = '\x1b[38;5;238m'  // dim separator
+
     return {
-      output: `
-Yubi Portfolio Assistant
-
-How to interact:
-  - Ask me about my projects, skills, or experience
-  - Examples: "What are your projects?"
-            "Tell me about your technical skills"
-            "What programming languages do you know?"
-
-Available commands:
-  help         - Show this help message
-  about        - About Yubi (profile)
-  clear        - Clear the terminal
-  info         - Show server info
- 
-Advanced: Contextual Conversations
-  Ask: "Tell me your 5 projects"
-  Then: "Tell me about the third one" -> Context remembered!
-
-`,
+      output: `\r\n${B}Commands${R}  ${S}${'─'.repeat(28)}${R}\r\n  ${B}help${R}    ${D}—${R} show this message\r\n  ${B}about${R}   ${D}—${R} profile and links\r\n  ${B}resume${R}  ${D}—${R} download resume\r\n  ${B}clear${R}   ${D}—${R} clear the terminal\r\n\r\n${B}Ask me anything:${R}\r\n  ${D}"What projects have you built?"\r\n  "What's your experience with AI?"\r\n  "Tell me about your background"${R}\r\n\r\n`,
       sessionId
     };
   }
@@ -63,15 +49,26 @@ export class InfoCommandHandler extends BaseCommandHandler {
 
   async execute(command: string, sessionId: string): Promise<CommandResult> {
     const apiUrl = getApiBaseUrl();
-    
-    return {
-      output: `
-📊 Server Information:
-  • Status: Online
-  • API Endpoint: ${apiUrl}
-  • Session ID: ${sessionId || 'Not started'}
 
-`,
+    return {
+      output: `\r\n\x1b[1mServer Information\x1b[0m\r\n  Status:     Online\r\n  API:        ${apiUrl}\r\n  Session:    ${sessionId || 'not started'}\r\n\r\n`,
+      sessionId
+    };
+  }
+}
+
+export class ResumeCommandHandler extends BaseCommandHandler {
+  canHandle(command: string): boolean {
+    return command.trim() === 'resume';
+  }
+
+  async execute(command: string, sessionId: string): Promise<CommandResult> {
+    // OSC 8 hyperlink for terminals that support it; WebLinksAddon auto-detects the plain URL too
+    const url = `${window.location.origin}/resume.pdf`
+    const link = `\x1b]8;;${url}\x1b\\${url}\x1b]8;;\x1b\\`
+
+    return {
+      output: `\r\n\x1b[1mResume\x1b[0m \x1b[38;5;244m— Yubi Khadka\x1b[0m\r\n\r\n  Download: \x1b[38;2;147;197;253m${link}\x1b[0m\r\n\r\n`,
       sessionId
     };
   }

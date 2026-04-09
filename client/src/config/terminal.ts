@@ -1,9 +1,13 @@
+export const MOBILE_BREAKPOINT = 640
+export const DESKTOP_FONT_SIZE = 16
+export const MOBILE_FONT_SIZE = 13
+
 export const TERMINAL_CONFIG = {
   cursorBlink: true,
   convertEol: true,
   fontFamily:
     'JetBrains Mono, Fira Mono, Roboto Mono, ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace',
-  fontSize: 16,
+  fontSize: DESKTOP_FONT_SIZE,
   lineHeight: 1.3,
   letterSpacing: 0,
   scrollback: 1000,
@@ -84,16 +88,16 @@ export const TERMINAL_COLORS = {
 export const THEMES = {
   matrix: {
     welcome: `
-██╗   ██╗██╗   ██╗██████╗ ██╗
-╚██╗ ██╔╝██║   ██║██╔══██╗██║
- ╚████╔╝ ██║   ██║██████╔╝██║
-  ╚██╔╝  ██║   ██║██╔══██╗██║
-   ██║   ╚██████╔╝██████╔╝██║
-   ╚═╝    ╚═════╝ ╚═════╝ ╚═╝
+\x1b[1m\x1b[38;5;81m██╗   ██╗██╗   ██╗██████╗ ██╗\x1b[0m
+\x1b[1m\x1b[38;5;81m╚██╗ ██╔╝██║   ██║██╔══██╗██║\x1b[0m
+\x1b[1m\x1b[38;5;81m ╚████╔╝ ██║   ██║██████╔╝██║\x1b[0m
+\x1b[1m\x1b[38;5;81m  ╚██╔╝  ██║   ██║██╔══██╗██║\x1b[0m
+\x1b[1m\x1b[38;5;81m   ██║   ╚██████╔╝██████╔╝██║\x1b[0m
+\x1b[1m\x1b[38;5;81m   ╚═╝    ╚═════╝ ╚═════╝ ╚═╝\x1b[0m
 
-🚀  Welcome to Yubi Portfolio Terminal!
-💬  Type 'help' to see available commands
-🌟  Explore my projects and experience through interactive conversation
+\x1b[38;5;244m  Software Engineer · Melbourne\x1b[0m
+
+  Type \x1b[1m'help'\x1b[0m to see available commands.
 
 `
   }

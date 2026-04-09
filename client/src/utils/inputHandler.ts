@@ -1,7 +1,6 @@
 import { Terminal } from '@xterm/xterm'
 import { THEMES } from '../config/terminal'
 import { writePrompt } from './terminal'
-import { getApiBaseUrl } from '../config/env'
 
 export interface InputState {
   current: string
@@ -91,30 +90,14 @@ export interface CommandResult {
 
 export const handleCommand = async (input: string, sessionId: string): Promise<CommandResult> => {
   const trimmedInput = input.trim();
-  
-  // Handle built-in commands
+
   if (trimmedInput === 'help') {
+    const B = '\x1b[1m'
+    const R = '\x1b[0m'
+    const D = '\x1b[38;5;244m'
+    const S = '\x1b[38;5;238m'
     return {
-      output: `
-Yubi Portfolio Assistant
-
-How to interact:
-  - Ask me about my projects, skills, or experience
-  - Examples: "What are your projects?"
-            "Tell me about your technical skills"
-            "What programming languages do you know?"
-
-Available commands:
-  help         - Show this help message
-  about        - About Yubi (profile)
-  clear        - Clear the terminal
-  info         - Show server info
-
-Advanced: Contextual Conversations
-  Ask: "Tell me your 5 projects"
-  Then: "Tell me about the third one" -> Context remembered!
-
-`,
+      output: `\r\n${B}Commands${R}  ${S}${'─'.repeat(28)}${R}\r\n  ${B}help${R}    ${D}—${R} show this message\r\n  ${B}about${R}   ${D}—${R} profile and links\r\n  ${B}resume${R}  ${D}—${R} download resume\r\n  ${B}clear${R}   ${D}—${R} clear the terminal\r\n\r\n${B}Ask me anything:${R}\r\n  ${D}"What projects have you built?"\r\n  "What's your experience with AI?"\r\n  "Tell me about your background"${R}\r\n\r\n`,
       sessionId
     };
   }
@@ -124,40 +107,22 @@ Advanced: Contextual Conversations
     return { output: '', sessionId };
   }
 
-  
   if (trimmedInput === 'clear') {
     return {
-      // Clear and re-print the intro so the terminal doesn't look "dead" after reset.
-      // Include ESC[3J to clear scrollback as well (prevents "double welcome").
       output: `\x1b[H\x1b[2J\x1b[3J${THEMES.matrix.welcome}`,
       sessionId
     };
   }
-  
-  // 'ping' was removed; keep this local so it doesn't trigger an API call.
-  if (trimmedInput === 'ping') {
-    return {
-      output: "Ping was removed. Use 'info' instead.\n",
-      sessionId,
-    };
-  }
-  
-  if (trimmedInput === 'info') {
-    const apiUrl = getApiBaseUrl()
-    
-    return {
-      output: `
-📊 Server Information:
-  • Status: Online
-  • API Endpoint: ${apiUrl}
-  • Session ID: ${sessionId || 'Not started'}
 
-`,
+  if (trimmedInput === 'resume') {
+    const url = `${window.location.origin}/resume.pdf`
+    window.open(url, '_blank', 'noopener,noreferrer')
+    return {
+      output: `\r\n\x1b[38;5;244m  Opening resume in a new tab...\x1b[0m\r\n\r\n`,
       sessionId
     };
   }
 
-  // For AI conversation, we need to handle streaming in the terminal directly
-  // This function will be called from the useTerminal hook with access to the terminal
+  // Everything else → AI streaming
   throw new Error('AI_STREAMING_NEEDED');
 };

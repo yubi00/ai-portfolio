@@ -2,8 +2,18 @@ import { useRef, useState, useEffect } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
-import { TERMINAL_CONFIG, THEMES } from '../config/terminal';
-import { writeToTerminal, writePrompt } from '../utils/terminal';
+import {
+  TERMINAL_CONFIG,
+  THEMES,
+  MOBILE_BREAKPOINT,
+  MOBILE_FONT_SIZE,
+} from '../config/terminal';
+import {
+  writeToTerminal,
+  writePrompt,
+  applyCodeHighlighting,
+  initialCodeHighlightState,
+} from '../utils/terminal';
 import { type InputState, handleCommand as processCommand } from '../utils/inputHandler';
 import { getApiBaseUrl, getAuthEnv } from '../config/env';
 import { getAuthorizationHeader } from '../utils/auth';
@@ -36,7 +46,11 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
   useEffect(() => {
     if (!terminalRef.current) return;
 
-    const term = new Terminal(TERMINAL_CONFIG);
+    // Responsive font size: smaller on narrow viewports (e.g. mobile)
+    const initialFontSize =
+      window.innerWidth < MOBILE_BREAKPOINT ? MOBILE_FONT_SIZE : TERMINAL_CONFIG.fontSize;
+
+    const term = new Terminal({ ...TERMINAL_CONFIG, fontSize: initialFontSize });
     term.loadAddon(fitAddon);
     term.loadAddon(webLinksAddon);
     term.open(terminalRef.current);
@@ -64,19 +78,19 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
         }
         return;
       }
-      
-      if (data === '\u001b[C') { // Right arrow  
+
+      if (data === '\u001b[C') { // Right arrow
         if (cursorPos < current.length) {
           cursorPos++;
           term.write('\u001b[C');
         }
         return;
       }
-      
+
       if (data === '\u001b[A' || data === '\u001b[B') { // Up/Down arrows
         return; // Ignore for now
       }
-      
+
       // Block ALL other escape sequences (anything starting with ESC)
       if (data.includes('\u001b') || data.charCodeAt(0) === 27) {
         return;
@@ -114,11 +128,11 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
           // Remove character at cursor position - 1
           current = current.slice(0, cursorPos - 1) + current.slice(cursorPos);
           cursorPos--;
-          
+
           // Clear from cursor to end of line, then redraw the remaining text
           const remaining = current.slice(cursorPos);
           term.write('\b' + remaining + ' '.repeat(1) + '\b'.repeat(remaining.length + 1));
-          
+
           // Update React state
           updateInputState({ current, cursorPos });
         }
@@ -128,11 +142,11 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
           // Insert character at cursor position
           current = current.slice(0, cursorPos) + sanitized + current.slice(cursorPos);
           cursorPos += sanitized.length;
-          
+
           // Redraw from cursor position: write new char + remaining text, then move cursor back
           const remaining = current.slice(cursorPos);
           term.write(sanitized + remaining + '\u001b[D'.repeat(remaining.length));
-          
+
           // Update React state
           updateInputState({ current, cursorPos });
         }
@@ -168,14 +182,40 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
     };
 
     const handleStreamingCommand = async (command: string, term: Terminal) => {
-      // Minimal: while fetching, show nothing extra (cursor blinks on the empty line).
-      // Add one blank line after the user's command so replies don't feel glued to the prompt.
+      // One blank line after the user's prompt so the reply doesn't feel glued to it.
       term.writeln('');
       term.scrollToBottom();
       term.focus();
 
+      // --- Animated "thinking" dots while waiting for the first token ---
+      const DOT_FRAMES = ['·', '· ·', '· · ·']
+      const DOT_COLOR  = '\x1b[38;5;244m'
+      const DOT_RESET  = '\x1b[0m'
+      let dotFrame = 0
+      let animationStarted = false
+
+      // Write the first frame on a new line so we have a line to overwrite
+      term.writeln(`${DOT_COLOR}${DOT_FRAMES[0]}${DOT_RESET}`)
+      animationStarted = true
+
+      const dotInterval = setInterval(() => {
+        dotFrame = (dotFrame + 1) % DOT_FRAMES.length
+        // Overwrite the current animation line in place
+        term.write(`\x1b[1A\x1b[2K\r${DOT_COLOR}${DOT_FRAMES[dotFrame]}${DOT_RESET}\r\n`)
+        term.scrollToBottom()
+      }, 400)
+
+      const clearAnimation = () => {
+        clearInterval(dotInterval)
+        if (animationStarted) {
+          // Erase the animation line
+          term.write('\x1b[1A\x1b[2K\r')
+          animationStarted = false
+        }
+      }
+
       const ERROR_MSG = (msg: string) => `\x1b[2m\x1b[38;5;203mError: ${msg}\x1b[0m`;
-      
+
       // Prepare request payload with session management
       const payload: { prompt: string; session_id?: string } = { prompt: command };
       // Use ref for immediate access to session ID (avoiding React state timing issues)
@@ -209,6 +249,8 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
           let buffer = '';
           let startedAnswer = false;
           let sawDone = false;
+          // Streaming code-highlight state — persists across chunks
+          let hlState = initialCodeHighlightState();
 
           const flushEvent = (raw: string) => {
             const lines = raw.split(/\r?\n/);
@@ -226,17 +268,25 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
               sessionIdRef.current = payload.session_id;
               options.onSessionChange?.(payload.session_id);
             } else if (type === 'partial' && typeof payload?.text === 'string') {
-              if (!startedAnswer) startedAnswer = true;
-              term.write(`\x1b[38;5;250m${payload.text}\x1b[0m`);
+              if (!startedAnswer) {
+                clearAnimation();
+                startedAnswer = true;
+              }
+              const { output, newState } = applyCodeHighlighting(payload.text, hlState);
+              hlState = newState;
+              term.write(output);
               term.scrollToBottom();
             } else if (type === 'final') {
               if (!startedAnswer) {
+                clearAnimation();
                 const reply: string = payload?.reply ?? '';
-                term.writeln(`\x1b[38;5;250m${reply}\x1b[0m`);
+                const { output } = applyCodeHighlighting(reply, hlState);
+                term.writeln(output);
               }
-              term.writeln(''); // First line after reply
-              term.writeln(''); // Extra spacing line
+              term.writeln(''); // spacing after reply
+              term.writeln('');
             } else if (type === 'error') {
+              clearAnimation();
               const msg = payload?.message || 'Unknown error';
               const detail = payload?.detail ? ` (${payload.detail})` : '';
               if (startedAnswer) term.writeln('');
@@ -262,12 +312,15 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
 
           // If backend returned a non-2xx without emitting an SSE error, surface status.
           if (!res.ok && !sawDone) {
+            clearAnimation();
             term.writeln(ERROR_MSG(`HTTP ${res.status}`));
           }
         } else {
+          clearAnimation();
           throw new Error(`HTTP ${res.status}`);
         }
       } catch (error) {
+        clearAnimation();
         const msg = error instanceof Error ? error.message : 'Unknown error';
         term.writeln(ERROR_MSG(msg));
       }
@@ -285,26 +338,40 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
   // Session ID management - removed automatic initialization
   // Session will be created only when first AI conversation happens
 
-  // Handle window resize
+  // Handle window resize and orientation changes
   useEffect(() => {
+    if (!terminal) return;
+
     let raf: number | undefined;
-    
-    const fitSafe = () => { 
-      try { 
-        fitAddon.fit() 
-      } catch {} 
-    }
-    
-    const handleResize = () => { 
-      if (raf) cancelAnimationFrame(raf); 
-      raf = requestAnimationFrame(fitSafe) 
-    }
+
+    const fitSafe = () => {
+      try { fitAddon.fit() } catch {}
+    };
+
+    const handleResize = () => {
+      if (raf) cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        // Adjust font size when crossing the mobile breakpoint
+        const isMobile = window.innerWidth < MOBILE_BREAKPOINT;
+        const targetSize = isMobile ? MOBILE_FONT_SIZE : TERMINAL_CONFIG.fontSize;
+        if (terminal.options.fontSize !== targetSize) {
+          terminal.options.fontSize = targetSize;
+        }
+        fitSafe();
+      });
+    };
+
+    // Orientation changes need a small delay for the viewport to settle
+    const handleOrientation = () => setTimeout(handleResize, 150);
 
     window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleOrientation);
+
     return () => {
       if (raf) cancelAnimationFrame(raf);
       window.removeEventListener('resize', handleResize);
-    }
+      window.removeEventListener('orientationchange', handleOrientation);
+    };
   }, [terminal, fitAddon]);
 
   const clearTerminal = () => {

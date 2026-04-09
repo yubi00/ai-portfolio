@@ -32,23 +32,22 @@ export const clearTerminalWithIntro = (term: Terminal) => {
 }
 
 export const writeHelpMessage = (term: Terminal) => {
-  term.writeln('Yubi Portfolio Assistant')
+  const B = '\x1b[1m'
+  const R = '\x1b[0m'
+  const D = '\x1b[38;5;244m'
+  const S = '\x1b[38;5;238m'
+
   term.writeln('')
-  term.writeln('\x1b[1mHow to interact:\x1b[0m')
-  term.writeln('  - Ask me about my projects, skills, or experience')
-  term.writeln('  - Examples: "What are your projects?"')
-  term.writeln('            "Tell me about your technical skills"')
-  term.writeln('            "What programming languages do you know?"')
+  term.writeln(`${B}Commands${R}  ${S}${'─'.repeat(28)}${R}`)
+  term.writeln(`  ${B}help${R}    ${D}—${R} show this message`)
+  term.writeln(`  ${B}about${R}   ${D}—${R} profile and links`)
+  term.writeln(`  ${B}resume${R}  ${D}—${R} download resume`)
+  term.writeln(`  ${B}clear${R}   ${D}—${R} clear the terminal`)
   term.writeln('')
-  term.writeln('\x1b[1mAvailable commands:\x1b[0m')
-  term.writeln('  help         - Show this help message')
-  term.writeln('  about        - About Yubi (profile)')
-  term.writeln('  clear        - Clear the terminal')
-  term.writeln('  info         - Show server info')
-  term.writeln('')
-  term.writeln('\x1b[1mAdvanced: Contextual Conversations\x1b[0m')
-  term.writeln('  Ask: "Tell me your 5 projects"')
-  term.writeln('  Then: "Tell me about the third one" -> Context remembered!')
+  term.writeln(`${B}Ask me anything:${R}`)
+  term.writeln(`  ${D}"What projects have you built?"${R}`)
+  term.writeln(`  ${D}"What's your experience with AI?"${R}`)
+  term.writeln(`  ${D}"Tell me about your background"${R}`)
 }
 
 export const writeErrorMessage = (term: Terminal, message: string) => {
@@ -90,3 +89,104 @@ export const writeToTerminal = (terminal: Terminal, text: string) => {
 export const clearLine = (terminal: Terminal) => {
   terminal.write('\x1b[2K\r');
 };
+
+// ---------------------------------------------------------------------------
+// Code-block syntax highlighting (streaming-safe)
+// ---------------------------------------------------------------------------
+
+export interface CodeHighlightState {
+  inCodeBlock: boolean   // inside a ``` fence
+  fenceBuffer: string    // accumulates partial ``` sequences at chunk boundaries
+  inInlineCode: boolean  // inside a single-backtick span
+}
+
+export const initialCodeHighlightState = (): CodeHighlightState => ({
+  inCodeBlock: false,
+  fenceBuffer: '',
+  inInlineCode: false,
+})
+
+const CODE_BLOCK_COLOR  = '\x1b[38;5;114m'  // muted green for fenced code blocks
+const INLINE_CODE_COLOR = '\x1b[38;5;152m'  // mint/teal for inline code
+const PROSE_COLOR       = '\x1b[38;5;250m'  // normal muted gray for prose
+
+/**
+ * Applies ANSI colour highlighting to a streaming text chunk based on
+ * markdown code fences (```) and inline backticks (`).
+ *
+ * Returns the coloured output string and updated state for the next chunk.
+ */
+export const applyCodeHighlighting = (
+  chunk: string,
+  state: CodeHighlightState,
+): { output: string; newState: CodeHighlightState } => {
+  let { inCodeBlock, fenceBuffer, inInlineCode } = state
+  let output = ''
+
+  // Prepend any pending partial fence from the previous chunk
+  const input = fenceBuffer + chunk
+  fenceBuffer = ''
+
+  let i = 0
+  while (i < input.length) {
+    const char = input[i]
+
+    // --- Detect triple backtick fence ---
+    if (char === '`') {
+      // Peek ahead to see if we have ``` (possibly split at the chunk boundary)
+      const remaining = input.slice(i)
+      if (remaining.startsWith('```')) {
+        // Consume the fence marker plus any optional language tag on the same line
+        let fenceEnd = i + 3
+        // Skip language identifier (e.g. "python", "ts") up to the newline
+        while (fenceEnd < input.length && input[fenceEnd] !== '\n') fenceEnd++
+        if (fenceEnd < input.length) {
+          // Include the newline in the consumed range
+          const fenceSlice = input.slice(i, fenceEnd + 1)
+          if (inCodeBlock) {
+            // Closing fence — emit it dimmed and switch back to prose
+            output += `\x1b[38;5;238m${fenceSlice}\x1b[0m`
+            inCodeBlock = false
+            inInlineCode = false
+          } else {
+            // Opening fence — emit it dimmed and switch to code block colour
+            output += `\x1b[38;5;238m${fenceSlice}\x1b[0m`
+            inCodeBlock = true
+            inInlineCode = false
+          }
+          i = fenceEnd + 1
+          continue
+        } else {
+          // The fence starts here but no newline yet — we're at the chunk end.
+          // Buffer the partial fence so the next chunk can complete it.
+          fenceBuffer = remaining
+          break
+        }
+      } else if (remaining.length < 3 && remaining.split('').every(c => c === '`')) {
+        // Could be the start of a ``` split across chunks — buffer it
+        fenceBuffer = remaining
+        break
+      } else if (!inCodeBlock) {
+        // Single backtick: toggle inline code
+        output += char
+        inInlineCode = !inInlineCode
+        i++
+        continue
+      }
+    }
+
+    // --- Emit character with appropriate colour ---
+    const color = inCodeBlock
+      ? CODE_BLOCK_COLOR
+      : inInlineCode
+        ? INLINE_CODE_COLOR
+        : PROSE_COLOR
+    output += `${color}${char}\x1b[0m`
+    i++
+  }
+
+  return {
+    output,
+    newState: { inCodeBlock, fenceBuffer, inInlineCode },
+  }
+}

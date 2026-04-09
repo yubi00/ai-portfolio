@@ -1,9 +1,9 @@
-import { 
-  BaseCommandHandler, 
-  HelpCommandHandler, 
-  ClearCommandHandler, 
-  InfoCommandHandler,
-  CommandResult 
+import {
+  BaseCommandHandler,
+  HelpCommandHandler,
+  ClearCommandHandler,
+  ResumeCommandHandler,
+  CommandResult
 } from './handlers';
 import { AIConversationHandler } from './aiHandler';
 
@@ -14,7 +14,7 @@ export class CommandProcessor {
     this.handlers = [
       new HelpCommandHandler(),
       new ClearCommandHandler(),
-      new InfoCommandHandler(),
+      new ResumeCommandHandler(),
       // AI handler should be last as it handles all remaining commands
       new AIConversationHandler()
     ];
