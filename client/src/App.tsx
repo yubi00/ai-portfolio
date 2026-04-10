@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { TerminalContainer } from './components';
 import { useTerminal } from './hooks/useTerminal';
 import { TERMINAL_STYLES, LAYOUT_CONSTANTS, DARK_BG, LIGHT_BG, DARK_XTERM_THEME, LIGHT_XTERM_THEME } from './config/terminal';
@@ -53,6 +55,8 @@ const AppInner: React.FC = () => {
 const App: React.FC = () => (
   <ThemeProvider>
     <AppInner />
+    <Analytics />
+    <SpeedInsights />
   </ThemeProvider>
 );
 
