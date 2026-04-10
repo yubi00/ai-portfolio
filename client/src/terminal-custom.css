@@ -24,11 +24,11 @@
   position: relative;
 }
 
-.xterm .xterm-viewport {
-  padding-bottom: 24px !important;
-  box-sizing: content-box !important;
+/* Hide scrollbar visually but keep scrolling functional */
+.xterm .xterm-viewport::-webkit-scrollbar {
+  width: 0 !important;
 }
 
-.xterm .xterm-viewport::-webkit-scrollbar-thumb {
-  background: #23232a;
+.xterm .xterm-viewport {
+  scrollbar-width: none !important; /* Firefox */
 }
