@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Mic, MicOff, X } from 'lucide-react';
+import { Mic, X } from 'lucide-react';
 import { useVoiceChat, VoiceState, TranscriptTurn } from '../hooks/useVoiceChat';
 import { useTheme } from '../context/ThemeContext';
 
@@ -29,7 +29,7 @@ const STATUS_HINT: Record<VoiceState, string> = {
     connecting: 'Opening voice session…',
     listening: 'Speak naturally — VAD active',
     thinking: 'Processing your question…',
-    speaking: 'Yubi is speaking — just speak or click interrupt to take over',
+    speaking: 'Yubi is speaking — just speak to interrupt',
     error: 'Connection error',
 };
 
@@ -159,16 +159,6 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onClose }) => {
                         title="Retry connection"
                         label="Retry"
                     />
-                )}
-
-                {isSpeaking && (
-                    <IconButton
-                        onClick={interruptNow}
-                        isDark={isDark}
-                        title="Interrupt Yubi"
-                    >
-                        <MicOff size={13} />
-                    </IconButton>
                 )}
 
                 <IconButton
