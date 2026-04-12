@@ -131,7 +131,8 @@ export class AudioPlaybackQueue {
         const samples = decodePcm16Base64(b64);
         const ctx = this.ensureCtx();
         const buf = ctx.createBuffer(1, samples.length, VOICE_SAMPLE_RATE);
-        buf.copyToChannel(samples, 0);
+        // Slice to guarantee a plain ArrayBuffer (not SharedArrayBuffer) — required by copyToChannel's type.
+        buf.copyToChannel(new Float32Array(samples.buffer.slice(samples.byteOffset, samples.byteOffset + samples.byteLength)), 0);
 
         const node = ctx.createBufferSource();
         node.buffer = buf;
