@@ -265,6 +265,7 @@ Backend facts the frontend repo should assume right now:
 - When `REQUIRE_AUTH=false`, browser can connect directly to `/ws`
 - When `REQUIRE_AUTH=true`, browser must fetch a short-lived FastAPI access token first and open `/ws?access_token=<token>`
 - Auth failures should be treated as immediate connection rejection before any voice session is created
+- `session.closed` can include `reason: "inactivity"`; frontend should treat that as an intentional idle close, not a transport reconnect case
 
 When Phase 7 starts in the frontend repo, the first success criterion should be:
 

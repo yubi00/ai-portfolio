@@ -11,6 +11,7 @@ export type VoiceState =
     | 'idle'        // disconnected
     | 'connecting'  // WS opening + mic permission in progress
     | 'reconnecting' // retrying after an unexpected live socket drop
+    | 'inactive'    // backend intentionally closed the session due to inactivity
     | 'listening'   // session live, waiting for user to speak
     | 'thinking'    // speech ended, waiting for first AI response chunk
     | 'speaking'    // receiving and playing AI audio
@@ -159,12 +160,33 @@ export function useVoiceChat(): UseVoiceChatResult {
         // Intentionally keep transcript visible after disconnect so user can read it.
     }, [setVoiceState]);
 
+    const transitionToInactive = useCallback((reason: string) => {
+        if (reconnectTimerRef.current !== null) {
+            window.clearTimeout(reconnectTimerRef.current);
+            reconnectTimerRef.current = null;
+        }
+        playbackRef.current.stopNow();
+        micRef.current?.stop();
+        micRef.current = null;
+        if (wsRef.current) {
+            wsRef.current.onclose = null;
+            wsRef.current.close();
+            wsRef.current = null;
+        }
+        setVoiceState('inactive');
+        setErrorMessage(
+            reason === 'inactivity'
+                ? 'Session inactive. Retry when you want to keep talking.'
+                : 'Voice session ended.'
+        );
+    }, [setVoiceState]);
+
     // ---------------------------------------------------------------------------
     // Public: connect
     // ---------------------------------------------------------------------------
 
     const connect = useCallback(() => {
-        if (stateRef.current !== 'idle' && stateRef.current !== 'error') return;
+        if (stateRef.current !== 'idle' && stateRef.current !== 'error' && stateRef.current !== 'inactive') return;
 
         setVoiceState('connecting');
         setErrorMessage(null);
@@ -237,6 +259,7 @@ export function useVoiceChat(): UseVoiceChatResult {
                 // treat it as a possible auth rejection and retry once with a refreshed access token.
                 let sessionReady = false;
                 let suppressCloseCleanup = false;
+                let sessionClosedReason: string | null = null;
                 const openedAt = Date.now();
 
                 // Per-connection turn ID state (captured in closure; reset on each connect call).
@@ -345,9 +368,15 @@ export function useVoiceChat(): UseVoiceChatResult {
                         }
 
                         // Backend closed the session (timeout, cost guard, etc.).
-                        case 'session.closed':
-                            disconnect();
+                        case 'session.closed': {
+                            sessionClosedReason = typeof msg.reason === 'string' ? msg.reason : 'normal';
+                            if (sessionClosedReason === 'inactivity') {
+                                transitionToInactive(sessionClosedReason);
+                            } else {
+                                disconnect();
+                            }
                             break;
+                        }
 
                         // Error from backend or relay.
                         case 'relay.error':
@@ -397,7 +426,9 @@ export function useVoiceChat(): UseVoiceChatResult {
                     const shouldReconnect =
                         isMountedRef.current &&
                         stateRef.current !== 'idle' &&
+                        stateRef.current !== 'inactive' &&
                         stateRef.current !== 'error' &&
+                        sessionClosedReason !== 'inactivity' &&
                         (sessionReady || stateRef.current === 'reconnecting') &&
                         reconnectAttempts < RECONNECT_BACKOFF_MS.length;
 
@@ -413,6 +444,10 @@ export function useVoiceChat(): UseVoiceChatResult {
                             if (!isMountedRef.current || stateRef.current !== 'reconnecting') return;
                             void attachSocket(requireAuth);
                         }, delay);
+                        return;
+                    }
+
+                    if (sessionClosedReason === 'inactivity' || stateRef.current === 'inactive') {
                         return;
                     }
 
@@ -440,7 +475,7 @@ export function useVoiceChat(): UseVoiceChatResult {
 
             void attachSocket(false);
         })();
-    }, [appendTurnDelta, disconnect, finalizeTurn, openVoiceWebSocket, sendCancel, sendToBackend, setVoiceState]);
+    }, [appendTurnDelta, disconnect, finalizeTurn, openVoiceWebSocket, sendCancel, sendToBackend, setVoiceState, transitionToInactive]);
 
     // ---------------------------------------------------------------------------
     // Cleanup on unmount

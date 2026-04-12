@@ -391,6 +391,7 @@ The frontend implementation should be prepared for the following server event ty
 - `response.cancelled`: current assistant turn was interrupted or cancelled; frontend should stop queued playback immediately
 - `input_audio_buffer.speech_started`: authoritative speech-start signal from backend / provider VAD
 - `session.closed`: terminal state for the current session; frontend should reset UI and reconnect only via explicit user action or deliberate reconnect logic
+- `session.closed` with `reason: "inactivity"`: intentional idle timeout; frontend should preserve transcript, stop local playback, surface an inactive state/message, and require explicit user retry rather than auto-reconnecting
 
 #### Browser Responsibilities
 

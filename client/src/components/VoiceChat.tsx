@@ -19,6 +19,7 @@ const STATE_LABEL: Record<VoiceState, string> = {
     idle: 'Ready',
     connecting: 'Connecting…',
     reconnecting: 'Reconnecting…',
+    inactive: 'Inactive',
     listening: 'Listening',
     thinking: 'Thinking…',
     speaking: 'Speaking',
@@ -29,6 +30,7 @@ const STATUS_HINT: Record<VoiceState, string> = {
     idle: '',
     connecting: 'Opening voice session…',
     reconnecting: 'Connection lost — rejoining the voice session…',
+    inactive: 'Session timed out from inactivity — reconnect when you are ready',
     listening: 'Speak naturally — VAD active',
     thinking: 'Processing your question…',
     speaking: 'Yubi is speaking — just speak to interrupt',
@@ -89,6 +91,9 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onClose }) => {
 
     const isSpeaking = state === 'speaking';
     const isError = state === 'error';
+    const isRetryable = state === 'error' || state === 'inactive';
+    const retryTitle = state === 'inactive' ? 'Reconnect voice session' : 'Retry connection';
+    const retryLabel = state === 'inactive' ? 'Reconnect' : 'Retry';
 
     return (
         <div
@@ -150,16 +155,16 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onClose }) => {
                             textOverflow: 'ellipsis',
                         }}
                     >
-                        {isError && errorMessage ? errorMessage : STATE_LABEL[state]}
+                        {(isError || state === 'inactive') && errorMessage ? errorMessage : STATE_LABEL[state]}
                     </div>
                 </div>
 
-                {isError && (
+                {isRetryable && (
                     <IconButton
                         onClick={handleRetry}
                         isDark={isDark}
-                        title="Retry connection"
-                        label="Retry"
+                        title={retryTitle}
+                        label={retryLabel}
                     />
                 )}
 
