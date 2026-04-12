@@ -48,6 +48,8 @@ Set these in `client/.env` (dev) or Vercel (prod):
 | Variable | Description |
 |----------|-------------|
 | `VITE_API_URL` | Backend API base URL (no trailing slash) |
+| `VITE_VOICE_ENABLED` | Enables the voice UI when set to `true`. Defaults to `false`. |
+| `VITE_VOICE_WS_URL` | Voice service WebSocket URL. Optional until the voice service is deployed. |
 | `VITE_TURNSTILE_SITE_KEY` | Cloudflare Turnstile site key |
 | `VITE_REQUIRE_AUTH` | `true` in production |
 | `VITE_DISABLE_AUTH` | Kill switch — keep `false` in prod |
@@ -59,6 +61,10 @@ Vercel is configured via `vercel.json`:
 - **Output:** `client/dist`
 
 Set the env vars above in Vercel → Project Settings → Environment Variables.
+
+Voice rollout is gated on the frontend:
+- Leave `VITE_VOICE_ENABLED` unset or `false` until the separate voice service is deployed.
+- Once the voice backend is live, set `VITE_VOICE_ENABLED=true` and provide `VITE_VOICE_WS_URL` if the WebSocket endpoint is not proxied from the same host.
 
 ## Architecture
 

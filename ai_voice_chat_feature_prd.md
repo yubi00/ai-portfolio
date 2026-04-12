@@ -320,7 +320,10 @@ The backend implementation now differs slightly from the original idealised desi
 
 - HTTP health check: `GET /health`
 - WebSocket endpoint: `ws(s)://<voice-service-host>/ws`
-- Frontend project should expose its own env var such as `VITE_VOICE_WS_URL` or derive the URL from a backend base URL
+- Frontend project should expose its own env vars such as:
+  - `VITE_VOICE_ENABLED` to gate the voice UI on/off independently of code deploys
+  - `VITE_VOICE_WS_URL` to point at the deployed voice service when needed
+- Current frontend behavior: voice UI is hidden by default unless `VITE_VOICE_ENABLED=true`
 
 #### Audio Input Requirements
 
@@ -510,6 +513,7 @@ Recommended frontend environment inputs:
 
 - backend HTTP base URL
 - backend WebSocket URL
+- `VITE_VOICE_ENABLED` feature flag so production can ship safely before the voice backend is live
 - optional feature flag to enable voice in non-production environments first
 
 ---
