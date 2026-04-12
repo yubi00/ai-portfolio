@@ -6,6 +6,7 @@ import { useTerminal } from './hooks/useTerminal';
 import { TERMINAL_STYLES, LAYOUT_CONSTANTS, DARK_BG, LIGHT_BG, DARK_XTERM_THEME, LIGHT_XTERM_THEME } from './config/terminal';
 import { AboutOverlay } from './components/AboutOverlay';
 import { Header } from './components/Header';
+import { VoiceChat } from './components/VoiceChat';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import '@xterm/xterm/css/xterm.css';
 import './styles.css';
@@ -14,6 +15,7 @@ import './terminal-custom.css';
 const AppInner: React.FC = () => {
   const { isDark } = useTheme();
   const [aboutVisible, setAboutVisible] = useState(false);
+  const [voiceOpen, setVoiceOpen] = useState(false);
 
   const { terminalRef, terminal } = useTerminal({
     onCommand: (command) => {
@@ -45,9 +47,13 @@ const AppInner: React.FC = () => {
 
   return (
     <div style={TERMINAL_STYLES.root(bg)}>
-      <Header />
+      <Header
+        voiceOpen={voiceOpen}
+        onVoiceToggle={() => setVoiceOpen(v => !v)}
+      />
       <AboutOverlay visible={aboutVisible} onClose={closeAbout} />
       <TerminalContainer terminalRef={terminalRef} topOffset={topOffset} isDark={isDark} />
+      {voiceOpen && <VoiceChat onClose={() => setVoiceOpen(false)} />}
     </div>
   );
 };

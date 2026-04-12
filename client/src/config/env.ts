@@ -21,6 +21,21 @@ export const getApiBaseUrl = (): string => {
   return '/api';
 };
 
+export const getVoiceWsUrl = (): string => {
+  const fromEnv = (import.meta.env?.VITE_VOICE_WS_URL as string | undefined)?.trim();
+  if (fromEnv) return fromEnv;
+
+  if (typeof window !== 'undefined') {
+    // Local Vite dev server — point to the default voice service port.
+    if (window.location.port === '5173') return 'ws://127.0.0.1:3001/ws';
+    // Deployed — derive from current origin (assumes voice service is proxied at /voice/ws).
+    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${proto}//${window.location.host}/voice/ws`;
+  }
+
+  return 'ws://127.0.0.1:3001/ws';
+};
+
 export const getAuthEnv = () => {
   const turnstileSiteKey =
     ((import.meta.env?.VITE_TURNSTILE_SITE_KEY as string | undefined) || '').trim();

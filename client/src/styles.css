@@ -35,3 +35,25 @@ html, body, #root {
 .xterm .xterm-viewport::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/* -------------------------------------------------------------------------
+   Voice chat panel — keyframe animations
+   ------------------------------------------------------------------------- */
+
+/* Pulsing dot: used for the listening indicator and streaming cursors */
+@keyframes voice-pulse {
+  0%, 100% { opacity: 1;   transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(0.78); }
+}
+
+/* Staggered bounce: used for the thinking dots loader */
+@keyframes voice-bounce {
+  0%, 100% { opacity: 0.35; transform: translateY(0); }
+  50%       { opacity: 1;    transform: translateY(-4px); }
+}
+
+/* Height wave: used for the speaking bar-chart indicator */
+@keyframes voice-wave {
+  from { height: 3px;  }
+  to   { height: 13px; }
+}
