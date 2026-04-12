@@ -8,6 +8,9 @@ import { AboutOverlay } from './components/AboutOverlay';
 import { Header } from './components/Header';
 import { VoiceChat } from './components/VoiceChat';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
+import { isVoiceEnabled } from './config/env';
+
+const VOICE_ENABLED = isVoiceEnabled();
 import '@xterm/xterm/css/xterm.css';
 import './styles.css';
 import './terminal-custom.css';
@@ -49,11 +52,11 @@ const AppInner: React.FC = () => {
     <div style={TERMINAL_STYLES.root(bg)}>
       <Header
         voiceOpen={voiceOpen}
-        onVoiceToggle={() => setVoiceOpen(v => !v)}
+        onVoiceToggle={VOICE_ENABLED ? () => setVoiceOpen(v => !v) : undefined}
       />
       <AboutOverlay visible={aboutVisible} onClose={closeAbout} />
       <TerminalContainer terminalRef={terminalRef} topOffset={topOffset} isDark={isDark} />
-      {voiceOpen && <VoiceChat onClose={() => setVoiceOpen(false)} />}
+      {VOICE_ENABLED && voiceOpen && <VoiceChat onClose={() => setVoiceOpen(false)} />}
     </div>
   );
 };

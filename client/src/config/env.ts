@@ -21,6 +21,11 @@ export const getApiBaseUrl = (): string => {
   return '/api';
 };
 
+// Voice feature flag — set VITE_VOICE_ENABLED=true to enable.
+// Defaults to false so production stays safe until the voice service is deployed.
+export const isVoiceEnabled = (): boolean =>
+  parseBool(import.meta.env?.VITE_VOICE_ENABLED);
+
 export const getVoiceWsUrl = (): string => {
   const fromEnv = (import.meta.env?.VITE_VOICE_WS_URL as string | undefined)?.trim();
   if (fromEnv) return fromEnv;
