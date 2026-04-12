@@ -56,6 +56,20 @@ const clearTokens = () => {
 
 let inflightAccess: Promise<string | null> | null = null;
 
+export const clearAccessToken = () => {
+  if (typeof window === 'undefined') return;
+  writeBundle(LS.accessToken, LS.accessExpiresAt, null);
+};
+
+export const getAccessToken = async (opts?: {
+  enforce?: boolean;
+  allowInteractive?: boolean;
+}): Promise<string | null> => {
+  const header = await getAuthorizationHeader(opts);
+  if (!header) return null;
+  return header.startsWith('Bearer ') ? header.slice(7) : header;
+};
+
 export const getAuthorizationHeader = async (opts?: {
   // If true, throw when unable to obtain an access token.
   enforce?: boolean;
@@ -127,7 +141,7 @@ export const getAuthorizationHeader = async (opts?: {
         try {
           const j = await sessionResp.json();
           detail = j?.detail ? String(j.detail) : '';
-        } catch {}
+        } catch { }
         const err = new Error(detail ? `auth_session_${sessionResp.status}:${detail}` : `auth_session_${sessionResp.status}`);
         if (enforce) throw err;
         return null;
@@ -169,7 +183,7 @@ export const getAuthorizationHeader = async (opts?: {
       try {
         const j = await tokenResp.json();
         detail = j?.detail ? String(j.detail) : '';
-      } catch {}
+      } catch { }
       const err = new Error(detail ? `auth_token_${tokenResp.status}:${detail}` : `auth_token_${tokenResp.status}`);
       if (enforce) throw err;
       return null;

@@ -51,7 +51,7 @@ Set these in `client/.env` (dev) or Vercel (prod):
 | `VITE_VOICE_ENABLED` | Enables the voice UI when set to `true`. Defaults to `false`. |
 | `VITE_VOICE_WS_URL` | Voice service WebSocket URL. Optional until the voice service is deployed. |
 | `VITE_TURNSTILE_SITE_KEY` | Cloudflare Turnstile site key |
-| `VITE_REQUIRE_AUTH` | `true` in production |
+| `VITE_REQUIRE_AUTH` | Enables the existing FastAPI short-lived token flow. When voice auth is enabled on the backend, the voice UI reuses this flow before opening `/ws`. |
 | `VITE_DISABLE_AUTH` | Kill switch — keep `false` in prod |
 
 ## Deployment
@@ -65,6 +65,7 @@ Set the env vars above in Vercel → Project Settings → Environment Variables.
 Voice rollout is gated on the frontend:
 - Leave `VITE_VOICE_ENABLED` unset or `false` until the separate voice service is deployed.
 - Once the voice backend is live, set `VITE_VOICE_ENABLED=true` and provide `VITE_VOICE_WS_URL` if the WebSocket endpoint is not proxied from the same host.
+- If the voice backend has `REQUIRE_AUTH=true`, keep `VITE_REQUIRE_AUTH=true` so the frontend fetches a FastAPI-issued short-lived access token and connects to `/ws?access_token=<token>`.
 
 ## Architecture
 

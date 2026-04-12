@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { startMicCapture, AudioPlaybackQueue, MicCapture } from '../utils/voiceAudio';
-import { getVoiceWsUrl } from '../config/env';
+import { getAuthEnv, getVoiceWsUrl } from '../config/env';
+import { clearAccessToken, getAccessToken } from '../utils/auth';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -38,6 +39,7 @@ export interface UseVoiceChatResult {
 const BARGE_IN_RMS_THRESHOLD = 0.025;
 // Consecutive high-energy chunks required before triggering local barge-in.
 const BARGE_IN_CHUNK_COUNT = 3;
+const AUTH_RETRY_CLOSE_WINDOW_MS = 1500;
 
 let _turnCounter = 0;
 const newTurnId = () => `t${++_turnCounter}-${Date.now()}`;
@@ -57,10 +59,29 @@ export function useVoiceChat(): UseVoiceChatResult {
     const micRef = useRef<MicCapture | null>(null);
     const playbackRef = useRef<AudioPlaybackQueue>(new AudioPlaybackQueue());
     const bargeInCountRef = useRef(0);
+    const isMountedRef = useRef(true);
 
     const setVoiceState = useCallback((next: VoiceState) => {
         stateRef.current = next;
         setState(next);
+    }, []);
+
+    const openVoiceWebSocket = useCallback(async (forceRefresh: boolean): Promise<WebSocket> => {
+        const { requireAuth } = getAuthEnv();
+        let url = getVoiceWsUrl();
+
+        if (!requireAuth) {
+            return new WebSocket(url);
+        }
+
+        if (forceRefresh) clearAccessToken();
+
+        const accessToken = await getAccessToken({ enforce: true, allowInteractive: true });
+        if (!accessToken) throw new Error('voice_auth_missing');
+
+        const sep = url.includes('?') ? '&' : '?';
+        url = `${url}${sep}access_token=${encodeURIComponent(accessToken)}`;
+        return new WebSocket(url);
     }, []);
 
     // ---------------------------------------------------------------------------
@@ -183,148 +204,214 @@ export function useVoiceChat(): UseVoiceChatResult {
 
             micRef.current = mic;
 
-            // Open WebSocket after mic is confirmed.
-            const ws = new WebSocket(getVoiceWsUrl());
-            wsRef.current = ws;
+            const { requireAuth } = getAuthEnv();
+            let authRetried = false;
 
-            // Per-connection turn ID state (captured in closure; reset on each connect call).
-            let assistantTurnId: string | null = null;
-            let userTurnId: string | null = null;
+            const attachSocket = async (forceRefresh: boolean) => {
+                let ws: WebSocket;
+                try {
+                    ws = await openVoiceWebSocket(forceRefresh);
+                } catch (error) {
+                    if (!isMountedRef.current) return;
+                    setVoiceState('error');
+                    const msg = error instanceof Error ? error.message : 'Voice auth failed';
+                    setErrorMessage(msg === 'voice_auth_missing'
+                        ? 'Voice auth failed. Refresh and try again.'
+                        : 'Could not obtain a voice access token.');
+                    micRef.current?.stop();
+                    micRef.current = null;
+                    return;
+                }
 
-            ws.onmessage = (ev: MessageEvent) => {
-                let msg: { type: string;[k: string]: unknown };
-                try { msg = JSON.parse(ev.data as string); } catch { return; }
+                wsRef.current = ws;
 
-                switch (msg.type) {
-                    // Session handshake — signal that the session is live and ready for audio.
-                    case 'session.created':
-                    case 'session.updated':
-                        setVoiceState('listening');
-                        break;
+                // Per-connection state. If the socket closes before session.created/session.updated,
+                // treat it as a possible auth rejection and retry once with a refreshed access token.
+                let sessionReady = false;
+                let suppressCloseCleanup = false;
+                const openedAt = Date.now();
 
-                    // Server VAD: user started speaking.
-                    case 'input_audio_buffer.speech_started':
-                        bargeInCountRef.current = 0;
-                        // Authoritative server-side barge-in while AI is playing.
-                        if (stateRef.current === 'speaking') {
-                            sendCancel();
+                // Per-connection turn ID state (captured in closure; reset on each connect call).
+                let assistantTurnId: string | null = null;
+                let userTurnId: string | null = null;
+
+                ws.onmessage = (ev: MessageEvent) => {
+                    let msg: { type: string;[k: string]: unknown };
+                    try { msg = JSON.parse(ev.data as string); } catch { return; }
+
+                    switch (msg.type) {
+                        // Session handshake — signal that the session is live and ready for audio.
+                        case 'session.created':
+                        case 'session.updated':
+                            sessionReady = true;
                             setVoiceState('listening');
-                        }
-                        break;
+                            break;
 
-                    // Server VAD: user stopped speaking; AI is about to respond.
-                    case 'input_audio_buffer.speech_stopped':
-                        if (stateRef.current === 'listening') {
+                        // Server VAD: user started speaking.
+                        case 'input_audio_buffer.speech_started':
+                            bargeInCountRef.current = 0;
+                            // Authoritative server-side barge-in while AI is playing.
+                            if (stateRef.current === 'speaking') {
+                                sendCancel();
+                                setVoiceState('listening');
+                            }
+                            break;
+
+                        // Server VAD: user stopped speaking; AI is about to respond.
+                        case 'input_audio_buffer.speech_stopped':
+                            if (stateRef.current === 'listening') {
+                                setVoiceState('thinking');
+                            }
+                            break;
+
+                        // AI response is starting.
+                        case 'response.created':
+                            assistantTurnId = newTurnId();
                             setVoiceState('thinking');
-                        }
-                        break;
+                            break;
 
-                    // AI response is starting.
-                    case 'response.created':
-                        assistantTurnId = newTurnId();
-                        setVoiceState('thinking');
-                        break;
-
-                    // AI audio chunk — queue for gapless playback.
-                    case 'response.audio.delta': {
-                        const chunk = msg.delta as string | undefined;
-                        if (chunk) {
-                            if (stateRef.current !== 'speaking') setVoiceState('speaking');
-                            playbackRef.current.enqueue(chunk);
+                        // AI audio chunk — queue for gapless playback.
+                        case 'response.audio.delta': {
+                            const chunk = msg.delta as string | undefined;
+                            if (chunk) {
+                                if (stateRef.current !== 'speaking') setVoiceState('speaking');
+                                playbackRef.current.enqueue(chunk);
+                            }
+                            break;
                         }
-                        break;
+
+                        // AI transcript chunk — stream into the assistant turn bubble.
+                        case 'response.audio_transcript.delta': {
+                            const delta = msg.delta as string | undefined;
+                            if (delta && assistantTurnId) {
+                                appendTurnDelta(assistantTurnId, 'assistant', delta);
+                            }
+                            break;
+                        }
+
+                        // AI transcript is complete. Audio may still be queued locally.
+                        case 'response.audio_transcript.done':
+                            if (assistantTurnId) finalizeTurn(assistantTurnId);
+                            break;
+
+                        // Backend finished sending. Wait for local audio drain before switching to listening.
+                        // This is the PRD requirement: response.done ≠ audio finished.
+                        case 'response.done':
+                            playbackRef.current.whenDrained(() => {
+                                if (stateRef.current === 'speaking') setVoiceState('listening');
+                            });
+                            break;
+
+                        // Current turn was interrupted or cancelled — stop audio immediately.
+                        case 'response.cancelled':
+                            playbackRef.current.stopNow();
+                            if (stateRef.current === 'speaking' || stateRef.current === 'thinking') {
+                                setVoiceState('listening');
+                            }
+                            break;
+
+                        // Live user transcript delta (while user is speaking).
+                        case 'conversation.item.input_audio_transcription.delta': {
+                            const delta = msg.delta as string | undefined;
+                            if (delta) {
+                                if (!userTurnId) userTurnId = newTurnId();
+                                appendTurnDelta(userTurnId, 'user', delta);
+                            }
+                            break;
+                        }
+
+                        // Final user transcript — replace accumulated deltas with confirmed text.
+                        case 'conversation.item.input_audio_transcription.completed': {
+                            const text = msg.transcript as string | undefined;
+                            if (userTurnId) {
+                                finalizeTurn(userTurnId, text);
+                            }
+                            userTurnId = null;
+                            break;
+                        }
+
+                        // Backend closed the session (timeout, cost guard, etc.).
+                        case 'session.closed':
+                            disconnect();
+                            break;
+
+                        // Error from backend or relay.
+                        case 'relay.error':
+                        case 'error': {
+                            const msg_ = ((msg.message ?? msg.error ?? 'Voice session error') as string);
+                            const normalized = String(msg_).toLowerCase();
+                            const authRejected = requireAuth && !sessionReady && (
+                                normalized.includes('auth') ||
+                                normalized.includes('token') ||
+                                normalized.includes('unauthorized') ||
+                                normalized.includes('forbidden')
+                            );
+
+                            if (authRejected && !authRetried) {
+                                authRetried = true;
+                                suppressCloseCleanup = true;
+                                try { ws.close(); } catch { }
+                                void attachSocket(true);
+                                return;
+                            }
+
+                            setVoiceState('error');
+                            setErrorMessage(String(msg_));
+                            break;
+                        }
+                    }
+                };
+
+                ws.onerror = () => {
+                    if (stateRef.current === 'error') return;
+                    if (!sessionReady) return;
+                    setVoiceState('error');
+                    setErrorMessage('Connection failed. Check that the voice service is running.');
+                };
+
+                ws.onclose = (ev: CloseEvent) => {
+                    if (wsRef.current === ws) wsRef.current = null;
+
+                    const closedBeforeSession = !sessionReady && (Date.now() - openedAt) < AUTH_RETRY_CLOSE_WINDOW_MS;
+                    if (requireAuth && closedBeforeSession && !authRetried && stateRef.current === 'connecting') {
+                        authRetried = true;
+                        suppressCloseCleanup = true;
+                        void attachSocket(true);
+                        return;
                     }
 
-                    // AI transcript chunk — stream into the assistant turn bubble.
-                    case 'response.audio_transcript.delta': {
-                        const delta = msg.delta as string | undefined;
-                        if (delta && assistantTurnId) {
-                            appendTurnDelta(assistantTurnId, 'assistant', delta);
+                    if (suppressCloseCleanup) return;
+
+                    micRef.current?.stop();
+                    micRef.current = null;
+
+                    if (stateRef.current !== 'idle' && stateRef.current !== 'error') {
+                        if (!sessionReady && requireAuth) {
+                            setVoiceState('error');
+                            setErrorMessage('Voice auth was rejected. Refresh and try again.');
+                            return;
                         }
-                        break;
-                    }
 
-                    // AI transcript is complete. Audio may still be queued locally.
-                    case 'response.audio_transcript.done':
-                        if (assistantTurnId) finalizeTurn(assistantTurnId);
-                        break;
-
-                    // Backend finished sending. Wait for local audio drain before switching to listening.
-                    // This is the PRD requirement: response.done ≠ audio finished.
-                    case 'response.done':
-                        playbackRef.current.whenDrained(() => {
-                            if (stateRef.current === 'speaking') setVoiceState('listening');
-                        });
-                        break;
-
-                    // Current turn was interrupted or cancelled — stop audio immediately.
-                    case 'response.cancelled':
-                        playbackRef.current.stopNow();
-                        if (stateRef.current === 'speaking' || stateRef.current === 'thinking') {
-                            setVoiceState('listening');
+                        if (!ev.wasClean) {
+                            setVoiceState('error');
+                            setErrorMessage('Voice connection dropped unexpectedly.');
                         }
-                        break;
-
-                    // Live user transcript delta (while user is speaking).
-                    case 'conversation.item.input_audio_transcription.delta': {
-                        const delta = msg.delta as string | undefined;
-                        if (delta) {
-                            if (!userTurnId) userTurnId = newTurnId();
-                            appendTurnDelta(userTurnId, 'user', delta);
-                        }
-                        break;
                     }
-
-                    // Final user transcript — replace accumulated deltas with confirmed text.
-                    case 'conversation.item.input_audio_transcription.completed': {
-                        const text = msg.transcript as string | undefined;
-                        if (userTurnId) {
-                            finalizeTurn(userTurnId, text);
-                        }
-                        userTurnId = null;
-                        break;
-                    }
-
-                    // Backend closed the session (timeout, cost guard, etc.).
-                    case 'session.closed':
-                        disconnect();
-                        break;
-
-                    // Error from backend or relay.
-                    case 'relay.error':
-                    case 'error': {
-                        const msg_ = ((msg.message ?? msg.error ?? 'Voice session error') as string);
-                        setVoiceState('error');
-                        setErrorMessage(String(msg_));
-                        break;
-                    }
-                }
+                };
             };
 
-            ws.onerror = () => {
-                setVoiceState('error');
-                setErrorMessage('Connection failed. Check that the voice service is running.');
-            };
-
-            ws.onclose = (ev: CloseEvent) => {
-                micRef.current?.stop();
-                micRef.current = null;
-                if (stateRef.current !== 'idle' && stateRef.current !== 'error') {
-                    if (!ev.wasClean) {
-                        setVoiceState('error');
-                        setErrorMessage('Voice connection dropped unexpectedly.');
-                    }
-                }
-            };
+            void attachSocket(false);
         })();
-    }, [setVoiceState, sendToBackend, sendCancel, appendTurnDelta, finalizeTurn, disconnect]);
+    }, [appendTurnDelta, disconnect, finalizeTurn, openVoiceWebSocket, sendCancel, sendToBackend, setVoiceState]);
 
     // ---------------------------------------------------------------------------
     // Cleanup on unmount
     // ---------------------------------------------------------------------------
 
     useEffect(() => {
+        isMountedRef.current = true;
         return () => {
+            isMountedRef.current = false;
             micRef.current?.stop();
             if (wsRef.current) {
                 wsRef.current.onclose = null;

@@ -312,7 +312,7 @@ The backend implementation now differs slightly from the original idealised desi
   - `realtime`
   - `turn-based`
 - Both modes are intended to converge on one frontend-facing contract, but today the Realtime path still forwards mostly OpenAI-shaped events while the turn-based path emits compatible equivalents
-- Authentication is not implemented yet; origin allowlisting and backend session caps are the only current admission controls
+- Authentication is optional and backend-controlled: when `REQUIRE_AUTH=true`, the voice service verifies the same short-lived HS256 access token format issued by the FastAPI backend
 
 ### Frontend Integration Contract (Current)
 
@@ -320,10 +320,9 @@ The backend implementation now differs slightly from the original idealised desi
 
 - HTTP health check: `GET /health`
 - WebSocket endpoint: `ws(s)://<voice-service-host>/ws`
-- Frontend project should expose its own env vars such as:
-  - `VITE_VOICE_ENABLED` to gate the voice UI on/off independently of code deploys
-  - `VITE_VOICE_WS_URL` to point at the deployed voice service when needed
-- Current frontend behavior: voice UI is hidden by default unless `VITE_VOICE_ENABLED=true`
+- Frontend project should expose its own env var such as `VITE_VOICE_WS_URL` or derive the URL from a backend base URL
+- If voice auth is enabled, the frontend must append the access token as `?access_token=<token>` when opening the WebSocket
+- Frontend should treat voice-token attachment as connection-time behavior only; token issuance and refresh stay in the main FastAPI auth flow
 
 #### Audio Input Requirements
 
@@ -348,6 +347,14 @@ Interrupt / cancel message shape:
   "type": "response.cancel"
 }
 ```
+
+Auth handshake behavior:
+
+- If `REQUIRE_AUTH=false`, connect directly to `/ws`
+- If `REQUIRE_AUTH=true`, fetch or refresh the short-lived access token from the FastAPI backend first, then open `/ws?access_token=<token>`
+- Token minting and refresh remain responsibilities of the FastAPI backend, not the voice service
+- If the token is missing, expired, malformed, or signed with the wrong secret, the voice service rejects the WebSocket before session creation
+- Frontend should treat an immediate close or pre-session rejection as a likely auth failure, clear the cached access token, refresh once, and retry the WebSocket connection one time before surfacing an error
 
 #### Server Events The Frontend Must Handle
 
@@ -396,6 +403,8 @@ The frontend repo should own:
 - transcript rendering for user and assistant
 - local interruption handling while assistant audio is playing
 - user-visible connection / error / retry states
+- obtaining a fresh FastAPI access token before voice connect when auth is enabled
+- distinguishing auth rejection from generic connection failure so retry can refresh token instead of blindly reconnecting
 
 #### Important Playback Detail
 
@@ -499,6 +508,7 @@ This PRD is intended to be copied into the separate frontend repo as implementat
 - the separate frontend repo does not need to implement provider logic, retrieval logic, or OpenAI session orchestration
 - the frontend repo only needs to integrate with the backend WebSocket contract and produce a polished product UI around it
 - the dev `public/test.html` page in the backend repo is the best reference for protocol behavior, transcript timing, and audio playback expectations
+- the frontend still needs one auth-specific integration pass: fetch short-lived FastAPI access tokens and append them to the voice WS URL when production auth is enabled
 
 Recommended frontend implementation order:
 
@@ -507,13 +517,14 @@ Recommended frontend implementation order:
 3. Render live user and assistant transcripts
 4. Queue and play streamed assistant audio
 5. Implement interruption UX and cancellation behavior
-6. Polish UI states, mobile behavior, and error recovery
+6. Add auth-aware connect flow for environments where voice auth is enabled
+7. Polish UI states, mobile behavior, and error recovery
 
 Recommended frontend environment inputs:
 
 - backend HTTP base URL
 - backend WebSocket URL
-- `VITE_VOICE_ENABLED` feature flag so production can ship safely before the voice backend is live
+- access to the main frontend auth/session utilities that mint or refresh FastAPI access tokens
 - optional feature flag to enable voice in non-production environments first
 
 ---

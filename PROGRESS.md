@@ -185,22 +185,41 @@ These apply to every line written, every phase, no exceptions:
 
 > Goal: Safe to deploy and show to visitors.
 
-- [ ] Add auth checks to Node WS endpoint (prevent abuse — token and/or origin validation)
-- [ ] Add rate limiting for voice session creation and WebSocket usage to control abuse and cost
-- [ ] Add JWT access-token verification path for the real frontend session before opening privileged voice sessions
-- [ ] Add session timeout: auto-close OpenAI WS after N minutes of silence
+- [x] Add auth checks to Node WS endpoint (prevent abuse — token and/or origin validation)
+- [x] Add rate limiting for voice session creation and WebSocket usage to control abuse and cost
+- [x] Add JWT access-token verification path for the real frontend session before opening privileged voice sessions
+- [x] Add session timeout: auto-close OpenAI WS after N minutes of silence
 - [ ] Add cost guard: max audio seconds per session config
+- [x] Update frontend WS connection flow to attach FastAPI-issued access token when voice auth is enabled
+- [x] Add frontend handling for auth-related WS rejection and reconnect after token refresh
 - [ ] Add graceful reconnect logic on browser WS disconnect
-- [ ] Add structured logging (w/ session IDs) for debugging production issues
-- [ ] Set up deployment: Dockerfile or Railway/Fly.io config for Node service
-- [ ] Deploy to staging and run end-to-end smoke test
-- [ ] Deploy to production
+- [x] Add structured logging (w/ session IDs) for debugging production issues
 
-**Phase 8 done when:** Service is live, monitored, and safe for real visitors.
+**Phase 8 done when:** WebSocket admission is authenticated and hardened, and the remaining reconnect / cost controls are ready for staging.
 
 ---
 
-## Phase 9 — Nice to Haves (Post-MVP)
+## Phase 9 — Cloud Run Deployment
+
+> Goal: Deploy the backend voice service to Google Cloud Run with a low-cost default configuration that is good enough for portfolio traffic.
+
+- [ ] Add deployment artifacts needed for Cloud Run (at minimum `Dockerfile`, and any helpful `.dockerignore` / deploy notes)
+- [ ] Ensure the service runs correctly with Cloud Run's `PORT` environment variable
+- [ ] Keep the initial Cloud Run setup cost-conscious (`min-instances=0` unless testing proves cold starts are unacceptable)
+- [ ] Configure production env vars and secret handling for `OPENAI_API_KEY`, `VOICE_MODE`, `ALLOWED_ORIGINS`, and session guardrails
+- [ ] Set Cloud Run request timeout appropriately for WebSocket voice sessions
+- [ ] Confirm WebSocket upgrade behavior works correctly behind Cloud Run
+- [ ] Deploy a staging or first private revision to Cloud Run
+- [ ] Verify `/health` and `/ws` work on the deployed service
+- [ ] Run an end-to-end smoke test from the real frontend against the deployed backend
+- [ ] Document the exact deploy / rollback steps used for Cloud Run
+- [ ] Add basic billing protection such as budget alerts or usage monitoring before public exposure
+
+**Phase 9 done when:** The backend is deployed to Cloud Run, reachable from the real frontend, and verified with a successful end-to-end voice conversation.
+
+---
+
+## Phase 10 — Nice to Haves (Post-MVP)
 
 > Do these only after Phase 8 is stable.
 
@@ -217,7 +236,7 @@ These apply to every line written, every phase, no exceptions:
 
 > Update this line as you progress.
 
-**Currently working on: Phase 7 — browser testing (Chrome/Firefox/Safari)**
+**Currently working on: Phase 8 hardening — WebSocket auth and admission controls are in place; reconnect and finer-grained cost controls are next**
 
 ---
 
@@ -235,6 +254,7 @@ What those docs now establish:
 - current WebSocket contract is concrete and should be implemented as-is first
 - Realtime and turn-based are backend-selected modes and should not require separate frontend implementations
 - frontend still needs to treat transcript completion and local audio drain as different lifecycle points
+- frontend also needs an auth-aware voice connect path for production mode
 
 Backend facts the frontend repo should assume right now:
 
@@ -242,8 +262,16 @@ Backend facts the frontend repo should assume right now:
 - Health endpoint: `/health`
 - Browser must send `input_audio_buffer.append` and `response.cancel`
 - Browser must handle session, transcript, audio, cancellation, and error events listed in the PRD
-- Auth is not implemented yet, so frontend integration can proceed before production auth work starts
+- When `REQUIRE_AUTH=false`, browser can connect directly to `/ws`
+- When `REQUIRE_AUTH=true`, browser must fetch a short-lived FastAPI access token first and open `/ws?access_token=<token>`
+- Auth failures should be treated as immediate connection rejection before any voice session is created
 
 When Phase 7 starts in the frontend repo, the first success criterion should be:
 
 - real portfolio UI can connect to the backend, stream mic audio, render transcripts, play assistant audio, and handle interruption cleanly
+
+When the next frontend auth pass starts, the first success criteria should be:
+
+- frontend refreshes a valid FastAPI access token before opening voice WebSocket when auth is enabled
+- frontend appends the token only to the voice WS connect URL
+- frontend shows a clean retry path when the token is missing, expired, or rejected
