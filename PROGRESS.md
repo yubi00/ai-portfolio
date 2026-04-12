@@ -192,10 +192,10 @@ These apply to every line written, every phase, no exceptions:
 - [ ] Add cost guard: max audio seconds per session config
 - [x] Update frontend WS connection flow to attach FastAPI-issued access token when voice auth is enabled
 - [x] Add frontend handling for auth-related WS rejection and reconnect after token refresh
-- [ ] Add graceful reconnect logic on browser WS disconnect
+- [x] Add graceful reconnect logic on browser WS disconnect
 - [x] Add structured logging (w/ session IDs) for debugging production issues
 
-**Phase 8 done when:** WebSocket admission is authenticated and hardened, and the remaining reconnect / cost controls are ready for staging.
+**Phase 8 done when:** WebSocket admission is authenticated and hardened, and the remaining cost controls are ready for staging.
 
 ---
 

@@ -355,6 +355,7 @@ Auth handshake behavior:
 - Token minting and refresh remain responsibilities of the FastAPI backend, not the voice service
 - If the token is missing, expired, malformed, or signed with the wrong secret, the voice service rejects the WebSocket before session creation
 - Frontend should treat an immediate close or pre-session rejection as a likely auth failure, clear the cached access token, refresh once, and retry the WebSocket connection one time before surfacing an error
+- After a live session has already been established, frontend should treat an unexpected browser-side WebSocket close as a transient transport failure: preserve transcript, stop queued local playback, retry reconnect with short backoff, and return to `listening` on success
 
 #### Server Events The Frontend Must Handle
 

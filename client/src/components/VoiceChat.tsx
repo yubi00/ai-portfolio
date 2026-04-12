@@ -18,6 +18,7 @@ interface VoiceChatProps {
 const STATE_LABEL: Record<VoiceState, string> = {
     idle: 'Ready',
     connecting: 'Connecting…',
+    reconnecting: 'Reconnecting…',
     listening: 'Listening',
     thinking: 'Thinking…',
     speaking: 'Speaking',
@@ -27,6 +28,7 @@ const STATE_LABEL: Record<VoiceState, string> = {
 const STATUS_HINT: Record<VoiceState, string> = {
     idle: '',
     connecting: 'Opening voice session…',
+    reconnecting: 'Connection lost — rejoining the voice session…',
     listening: 'Speak naturally — VAD active',
     thinking: 'Processing your question…',
     speaking: 'Yubi is speaking — just speak to interrupt',
@@ -192,7 +194,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onClose }) => {
                 )}
 
                 {/* Connecting / thinking with no turns yet — show a loader */}
-                {transcript.length === 0 && (state === 'connecting' || state === 'thinking') && (
+                {transcript.length === 0 && (state === 'connecting' || state === 'reconnecting' || state === 'thinking') && (
                     <div
                         style={{
                             display: 'flex',
@@ -301,7 +303,7 @@ const StatusDot: React.FC<StatusDotProps> = ({ state, accentCol, errorCol }) => 
     const color =
         state === 'error' ? errorCol :
             state === 'idle' ? '#4b5563' :
-                state === 'connecting' ? '#6b7280' :
+                state === 'connecting' || state === 'reconnecting' ? '#6b7280' :
                     state === 'listening' ? '#10b981' :
                         accentCol;
 
@@ -350,7 +352,7 @@ const ActivityIndicator: React.FC<ActivityIndicatorProps> = ({ state, accentCol,
             />
         );
     }
-    if (state === 'thinking' || state === 'connecting') {
+    if (state === 'thinking' || state === 'connecting' || state === 'reconnecting') {
         return <DotsLoader color={accentCol} size={5} />;
     }
     if (state === 'speaking') {

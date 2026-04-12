@@ -10,6 +10,7 @@ import { clearAccessToken, getAccessToken } from '../utils/auth';
 export type VoiceState =
     | 'idle'        // disconnected
     | 'connecting'  // WS opening + mic permission in progress
+    | 'reconnecting' // retrying after an unexpected live socket drop
     | 'listening'   // session live, waiting for user to speak
     | 'thinking'    // speech ended, waiting for first AI response chunk
     | 'speaking'    // receiving and playing AI audio
@@ -40,6 +41,7 @@ const BARGE_IN_RMS_THRESHOLD = 0.025;
 // Consecutive high-energy chunks required before triggering local barge-in.
 const BARGE_IN_CHUNK_COUNT = 3;
 const AUTH_RETRY_CLOSE_WINDOW_MS = 1500;
+const RECONNECT_BACKOFF_MS = [400, 1200] as const;
 
 let _turnCounter = 0;
 const newTurnId = () => `t${++_turnCounter}-${Date.now()}`;
@@ -60,6 +62,7 @@ export function useVoiceChat(): UseVoiceChatResult {
     const playbackRef = useRef<AudioPlaybackQueue>(new AudioPlaybackQueue());
     const bargeInCountRef = useRef(0);
     const isMountedRef = useRef(true);
+    const reconnectTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
 
     const setVoiceState = useCallback((next: VoiceState) => {
         stateRef.current = next;
@@ -139,6 +142,10 @@ export function useVoiceChat(): UseVoiceChatResult {
     // ---------------------------------------------------------------------------
 
     const disconnect = useCallback(() => {
+        if (reconnectTimerRef.current !== null) {
+            window.clearTimeout(reconnectTimerRef.current);
+            reconnectTimerRef.current = null;
+        }
         micRef.current?.stop();
         micRef.current = null;
         playbackRef.current.stopNow();
@@ -206,6 +213,7 @@ export function useVoiceChat(): UseVoiceChatResult {
 
             const { requireAuth } = getAuthEnv();
             let authRetried = false;
+            let reconnectAttempts = 0;
 
             const attachSocket = async (forceRefresh: boolean) => {
                 let ws: WebSocket;
@@ -244,6 +252,12 @@ export function useVoiceChat(): UseVoiceChatResult {
                         case 'session.created':
                         case 'session.updated':
                             sessionReady = true;
+                            reconnectAttempts = 0;
+                            if (reconnectTimerRef.current !== null) {
+                                window.clearTimeout(reconnectTimerRef.current);
+                                reconnectTimerRef.current = null;
+                            }
+                            setErrorMessage(null);
                             setVoiceState('listening');
                             break;
 
@@ -363,10 +377,8 @@ export function useVoiceChat(): UseVoiceChatResult {
                 };
 
                 ws.onerror = () => {
-                    if (stateRef.current === 'error') return;
-                    if (!sessionReady) return;
-                    setVoiceState('error');
-                    setErrorMessage('Connection failed. Check that the voice service is running.');
+                    // Browser WebSocket errors are typically followed by onclose.
+                    // Let the close handler decide whether to reconnect or surface an error.
                 };
 
                 ws.onclose = (ev: CloseEvent) => {
@@ -382,6 +394,28 @@ export function useVoiceChat(): UseVoiceChatResult {
 
                     if (suppressCloseCleanup) return;
 
+                    const shouldReconnect =
+                        isMountedRef.current &&
+                        stateRef.current !== 'idle' &&
+                        stateRef.current !== 'error' &&
+                        (sessionReady || stateRef.current === 'reconnecting') &&
+                        reconnectAttempts < RECONNECT_BACKOFF_MS.length;
+
+                    if (shouldReconnect) {
+                        playbackRef.current.stopNow();
+                        reconnectAttempts += 1;
+                        const delay = RECONNECT_BACKOFF_MS[reconnectAttempts - 1];
+                        setErrorMessage(null);
+                        setVoiceState('reconnecting');
+
+                        reconnectTimerRef.current = window.setTimeout(() => {
+                            reconnectTimerRef.current = null;
+                            if (!isMountedRef.current || stateRef.current !== 'reconnecting') return;
+                            void attachSocket(requireAuth);
+                        }, delay);
+                        return;
+                    }
+
                     micRef.current?.stop();
                     micRef.current = null;
 
@@ -394,7 +428,11 @@ export function useVoiceChat(): UseVoiceChatResult {
 
                         if (!ev.wasClean) {
                             setVoiceState('error');
-                            setErrorMessage('Voice connection dropped unexpectedly.');
+                            setErrorMessage(
+                                reconnectAttempts > 0
+                                    ? 'Voice connection was lost and reconnect failed. Retry to continue.'
+                                    : 'Voice connection dropped unexpectedly.'
+                            );
                         }
                     }
                 };
@@ -412,6 +450,10 @@ export function useVoiceChat(): UseVoiceChatResult {
         isMountedRef.current = true;
         return () => {
             isMountedRef.current = false;
+            if (reconnectTimerRef.current !== null) {
+                window.clearTimeout(reconnectTimerRef.current);
+                reconnectTimerRef.current = null;
+            }
             micRef.current?.stop();
             if (wsRef.current) {
                 wsRef.current.onclose = null;
