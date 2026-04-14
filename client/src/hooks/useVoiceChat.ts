@@ -12,6 +12,7 @@ export type VoiceState =
     | 'connecting'  // WS opening + mic permission in progress
     | 'reconnecting' // retrying after an unexpected live socket drop
     | 'inactive'    // backend intentionally closed the session due to inactivity
+    | 'limit_reached' // backend closed the session after the audio budget was exhausted
     | 'listening'   // session live, waiting for user to speak
     | 'thinking'    // speech ended, waiting for first AI response chunk
     | 'speaking'    // receiving and playing AI audio
@@ -181,12 +182,34 @@ export function useVoiceChat(): UseVoiceChatResult {
         );
     }, [setVoiceState]);
 
+    const transitionToLimitReached = useCallback(() => {
+        if (reconnectTimerRef.current !== null) {
+            window.clearTimeout(reconnectTimerRef.current);
+            reconnectTimerRef.current = null;
+        }
+        playbackRef.current.stopNow();
+        micRef.current?.stop();
+        micRef.current = null;
+        if (wsRef.current) {
+            wsRef.current.onclose = null;
+            wsRef.current.close();
+            wsRef.current = null;
+        }
+        setVoiceState('limit_reached');
+        setErrorMessage('This voice session reached its audio limit. Start a new conversation to continue.');
+    }, [setVoiceState]);
+
     // ---------------------------------------------------------------------------
     // Public: connect
     // ---------------------------------------------------------------------------
 
     const connect = useCallback(() => {
-        if (stateRef.current !== 'idle' && stateRef.current !== 'error' && stateRef.current !== 'inactive') return;
+        if (
+            stateRef.current !== 'idle' &&
+            stateRef.current !== 'error' &&
+            stateRef.current !== 'inactive' &&
+            stateRef.current !== 'limit_reached'
+        ) return;
 
         setVoiceState('connecting');
         setErrorMessage(null);
@@ -372,6 +395,8 @@ export function useVoiceChat(): UseVoiceChatResult {
                             sessionClosedReason = typeof msg.reason === 'string' ? msg.reason : 'normal';
                             if (sessionClosedReason === 'inactivity') {
                                 transitionToInactive(sessionClosedReason);
+                            } else if (sessionClosedReason === 'max_audio') {
+                                transitionToLimitReached();
                             } else {
                                 disconnect();
                             }
@@ -427,8 +452,10 @@ export function useVoiceChat(): UseVoiceChatResult {
                         isMountedRef.current &&
                         stateRef.current !== 'idle' &&
                         stateRef.current !== 'inactive' &&
+                        stateRef.current !== 'limit_reached' &&
                         stateRef.current !== 'error' &&
                         sessionClosedReason !== 'inactivity' &&
+                        sessionClosedReason !== 'max_audio' &&
                         (sessionReady || stateRef.current === 'reconnecting') &&
                         reconnectAttempts < RECONNECT_BACKOFF_MS.length;
 
@@ -447,7 +474,12 @@ export function useVoiceChat(): UseVoiceChatResult {
                         return;
                     }
 
-                    if (sessionClosedReason === 'inactivity' || stateRef.current === 'inactive') {
+                    if (
+                        sessionClosedReason === 'inactivity' ||
+                        sessionClosedReason === 'max_audio' ||
+                        stateRef.current === 'inactive' ||
+                        stateRef.current === 'limit_reached'
+                    ) {
                         return;
                     }
 
@@ -475,7 +507,7 @@ export function useVoiceChat(): UseVoiceChatResult {
 
             void attachSocket(false);
         })();
-    }, [appendTurnDelta, disconnect, finalizeTurn, openVoiceWebSocket, sendCancel, sendToBackend, setVoiceState, transitionToInactive]);
+    }, [appendTurnDelta, disconnect, finalizeTurn, openVoiceWebSocket, sendCancel, sendToBackend, setVoiceState, transitionToInactive, transitionToLimitReached]);
 
     // ---------------------------------------------------------------------------
     // Cleanup on unmount

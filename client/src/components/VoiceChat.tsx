@@ -3,50 +3,39 @@ import { Mic, X } from 'lucide-react';
 import { useVoiceChat, VoiceState, TranscriptTurn } from '../hooks/useVoiceChat';
 import { useTheme } from '../context/ThemeContext';
 
-// ---------------------------------------------------------------------------
-// Public props
-// ---------------------------------------------------------------------------
-
 interface VoiceChatProps {
     onClose: () => void;
 }
 
-// ---------------------------------------------------------------------------
-// Copy / label maps
-// ---------------------------------------------------------------------------
-
 const STATE_LABEL: Record<VoiceState, string> = {
     idle: 'Ready',
-    connecting: 'Connecting…',
-    reconnecting: 'Reconnecting…',
+    connecting: 'Connecting...',
+    reconnecting: 'Reconnecting...',
     inactive: 'Inactive',
+    limit_reached: 'Audio limit reached',
     listening: 'Listening',
-    thinking: 'Thinking…',
+    thinking: 'Thinking...',
     speaking: 'Speaking',
     error: 'Error',
 };
 
 const STATUS_HINT: Record<VoiceState, string> = {
     idle: '',
-    connecting: 'Opening voice session…',
-    reconnecting: 'Connection lost — rejoining the voice session…',
-    inactive: 'Session timed out from inactivity — reconnect when you are ready',
-    listening: 'Speak naturally — VAD active',
-    thinking: 'Processing your question…',
-    speaking: 'Yubi is speaking — just speak to interrupt',
+    connecting: 'Opening voice session...',
+    reconnecting: 'Connection lost; rejoining the voice session...',
+    inactive: 'Session timed out from inactivity. Reconnect when you are ready.',
+    limit_reached: 'This voice session reached its audio limit. Start a new conversation to continue.',
+    listening: 'Speak naturally. VAD active.',
+    thinking: 'Processing your question...',
+    speaking: 'Yubi is speaking. Just speak to interrupt.',
     error: 'Connection error',
 };
 
-// ---------------------------------------------------------------------------
-// Main component
-// ---------------------------------------------------------------------------
-
 export const VoiceChat: React.FC<VoiceChatProps> = ({ onClose }) => {
     const { isDark } = useTheme();
-    const { state, transcript, errorMessage, connect, disconnect, interruptNow } = useVoiceChat();
+    const { state, transcript, errorMessage, connect, disconnect } = useVoiceChat();
     const transcriptRef = useRef<HTMLDivElement>(null);
 
-    // Connect on mount; disconnect on unmount.
     useEffect(() => {
         connect();
         return () => {
@@ -55,7 +44,6 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onClose }) => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Auto-scroll transcript to newest turn.
     useEffect(() => {
         const el = transcriptRef.current;
         if (!el) return;
@@ -69,13 +57,8 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onClose }) => {
 
     const handleRetry = () => {
         disconnect();
-        // Small delay to let disconnect settle before reconnecting.
         window.setTimeout(connect, 120);
     };
-
-    // ---------------------------------------------------------------------------
-    // Design tokens — match the existing terminal palette
-    // ---------------------------------------------------------------------------
 
     const panelBg = isDark ? 'rgba(11, 11, 15, 0.97)' : 'rgba(252, 248, 240, 0.97)';
     const headerBg = isDark ? 'rgba(255,255,255,0.025)' : 'rgba(0,0,0,0.025)';
@@ -89,11 +72,20 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onClose }) => {
     const aiBubBg = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)';
     const aiBubBor = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)';
 
-    const isSpeaking = state === 'speaking';
-    const isError = state === 'error';
-    const isRetryable = state === 'error' || state === 'inactive';
-    const retryTitle = state === 'inactive' ? 'Reconnect voice session' : 'Retry connection';
-    const retryLabel = state === 'inactive' ? 'Reconnect' : 'Retry';
+    const isTerminalProblem = state === 'error';
+    const isRetryable = state === 'error' || state === 'inactive' || state === 'limit_reached';
+    const retryTitle =
+        state === 'inactive'
+            ? 'Reconnect voice session'
+            : state === 'limit_reached'
+                ? 'Start a new voice conversation'
+                : 'Retry connection';
+    const retryLabel =
+        state === 'inactive'
+            ? 'Reconnect'
+            : state === 'limit_reached'
+                ? 'New chat'
+                : 'Retry';
 
     return (
         <div
@@ -101,11 +93,9 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onClose }) => {
             aria-label="Voice chat with Yubi"
             style={{
                 position: 'fixed',
-                // Sits just below the header.
                 top: 42,
                 right: 0,
                 bottom: 0,
-                // 380px on desktop, full-width on narrow screens.
                 width: 'min(380px, 100vw)',
                 zIndex: 16,
                 display: 'flex',
@@ -117,9 +107,6 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onClose }) => {
                 boxShadow: isDark ? '-6px 0 40px rgba(0,0,0,0.55)' : '-6px 0 40px rgba(0,0,0,0.10)',
             }}
         >
-            {/* ------------------------------------------------------------------ */}
-            {/* Panel header                                                        */}
-            {/* ------------------------------------------------------------------ */}
             <div
                 style={{
                     display: 'flex',
@@ -148,14 +135,14 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onClose }) => {
                     <div
                         style={{
                             fontSize: 10.5,
-                            color: isError ? errorCol : dimCol,
+                            color: isTerminalProblem ? errorCol : dimCol,
                             marginTop: 2,
                             whiteSpace: 'nowrap',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
                         }}
                     >
-                        {(isError || state === 'inactive') && errorMessage ? errorMessage : STATE_LABEL[state]}
+                        {(state === 'error') && errorMessage ? errorMessage : STATE_LABEL[state]}
                     </div>
                 </div>
 
@@ -177,9 +164,6 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onClose }) => {
                 </IconButton>
             </div>
 
-            {/* ------------------------------------------------------------------ */}
-            {/* Transcript area                                                     */}
-            {/* ------------------------------------------------------------------ */}
             <div
                 ref={transcriptRef}
                 style={{
@@ -189,16 +173,13 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onClose }) => {
                     display: 'flex',
                     flexDirection: 'column',
                     gap: 14,
-                    // Smooth scroll so new turns glide into view.
                     scrollBehavior: 'smooth',
                 }}
             >
-                {/* Empty listening state — prompt the user */}
                 {transcript.length === 0 && state === 'listening' && (
                     <EmptyListeningPrompt dimCol={dimCol} accentCol={accentCol} />
                 )}
 
-                {/* Connecting / thinking with no turns yet — show a loader */}
                 {transcript.length === 0 && (state === 'connecting' || state === 'reconnecting' || state === 'thinking') && (
                     <div
                         style={{
@@ -212,12 +193,10 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onClose }) => {
                     </div>
                 )}
 
-                {/* Conversation turns */}
                 {transcript.map(turn => (
                     <TurnBubble
                         key={turn.id}
                         turn={turn}
-                        isDark={isDark}
                         textCol={textCol}
                         dimCol={dimCol}
                         accentCol={accentCol}
@@ -229,9 +208,6 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onClose }) => {
                 ))}
             </div>
 
-            {/* ------------------------------------------------------------------ */}
-            {/* Status bar                                                          */}
-            {/* ------------------------------------------------------------------ */}
             <div
                 style={{
                     display: 'flex',
@@ -247,7 +223,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onClose }) => {
                 <span
                     style={{
                         fontSize: 11,
-                        color: isError ? errorCol : dimCol,
+                        color: isTerminalProblem ? errorCol : dimCol,
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
@@ -259,10 +235,6 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onClose }) => {
         </div>
     );
 };
-
-// ---------------------------------------------------------------------------
-// Sub-components
-// ---------------------------------------------------------------------------
 
 interface IconButtonProps {
     onClick: () => void;
@@ -297,7 +269,6 @@ const IconButton: React.FC<IconButtonProps> = ({ onClick, isDark, title, label, 
     </button>
 );
 
-// The coloured dot in the panel header.
 interface StatusDotProps {
     state: VoiceState;
     accentCol: string;
@@ -306,11 +277,15 @@ interface StatusDotProps {
 
 const StatusDot: React.FC<StatusDotProps> = ({ state, accentCol, errorCol }) => {
     const color =
-        state === 'error' ? errorCol :
-            state === 'idle' ? '#4b5563' :
-                state === 'connecting' || state === 'reconnecting' ? '#6b7280' :
-                    state === 'listening' ? '#10b981' :
-                        accentCol;
+        state === 'error'
+            ? errorCol
+            : state === 'idle'
+                ? '#4b5563'
+                : state === 'connecting' || state === 'reconnecting'
+                    ? '#6b7280'
+                    : state === 'listening'
+                        ? '#10b981'
+                        : accentCol;
 
     const shouldPulse = state === 'listening' || state === 'speaking';
 
@@ -328,7 +303,6 @@ const StatusDot: React.FC<StatusDotProps> = ({ state, accentCol, errorCol }) => 
     );
 };
 
-// Animated bar-chart speaker indicator (shown in the status bar while speaking).
 interface ActivityIndicatorProps {
     state: VoiceState;
     accentCol: string;
@@ -337,11 +311,7 @@ interface ActivityIndicatorProps {
 
 const ActivityIndicator: React.FC<ActivityIndicatorProps> = ({ state, accentCol, errorCol }) => {
     if (state === 'error') {
-        return (
-            <div
-                style={{ width: 8, height: 8, borderRadius: '50%', background: errorCol, flexShrink: 0 }}
-            />
-        );
+        return <div style={{ width: 8, height: 8, borderRadius: '50%', background: errorCol, flexShrink: 0 }} />;
     }
     if (state === 'listening') {
         return (
@@ -385,14 +355,9 @@ const ActivityIndicator: React.FC<ActivityIndicatorProps> = ({ state, accentCol,
             </div>
         );
     }
-    return (
-        <div
-            style={{ width: 8, height: 8, borderRadius: '50%', background: '#4b5563', flexShrink: 0 }}
-        />
-    );
+    return <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#4b5563', flexShrink: 0 }} />;
 };
 
-// Three-dot loading animation.
 interface DotsLoaderProps {
     color: string;
     size?: number;
@@ -416,7 +381,6 @@ const DotsLoader: React.FC<DotsLoaderProps> = ({ color, size = 6 }) => (
     </div>
 );
 
-// Empty state shown in the transcript area while the session is live but quiet.
 interface EmptyListeningPromptProps {
     dimCol: string;
     accentCol: string;
@@ -445,15 +409,15 @@ const EmptyListeningPrompt: React.FC<EmptyListeningPromptProps> = ({ dimCol, acc
                 margin: 0,
             }}
         >
-            Ask about projects, skills,<br />or Yubi's experience
+            Ask about projects, skills,
+            <br />
+            or Yubi&apos;s experience
         </p>
     </div>
 );
 
-// A single conversation turn bubble.
 interface TurnBubbleProps {
     turn: TranscriptTurn;
-    isDark: boolean;
     textCol: string;
     dimCol: string;
     accentCol: string;
@@ -474,6 +438,7 @@ const TurnBubble: React.FC<TurnBubbleProps> = ({
     aiBubBor,
 }) => {
     const isUser = turn.role === 'user';
+
     return (
         <div
             style={{
@@ -508,9 +473,8 @@ const TurnBubble: React.FC<TurnBubbleProps> = ({
                     wordBreak: 'break-word',
                 }}
             >
-                {turn.text || <span style={{ opacity: 0.35 }}>…</span>}
+                {turn.text || <span style={{ opacity: 0.35 }}>...</span>}
 
-                {/* Streaming cursor — shown while the turn is still accumulating text */}
                 {!turn.done && (
                     <span
                         style={{
