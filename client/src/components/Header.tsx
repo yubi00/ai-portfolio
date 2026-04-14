@@ -96,7 +96,7 @@ export const Header: React.FC<HeaderProps> = ({ voiceOpen = false, voiceEnabled 
               zIndex: 30,
             }}
           >
-            Voice chat coming soon
+            Talk to Yubi coming soon
           </div>
         )}
       </div>

@@ -3,7 +3,7 @@ import { getApiBaseUrl } from '../config/env'
 
 // Prompt style: keep it readable but low-noise. Change PROMPT_USER_COLOR to taste.
 // Good options: 245 (muted gray), 110 (soft blue), 108 (muted green), 137 (muted amber).
-const PROMPT_USER = 'yubi@yubikhadka'
+const PROMPT_USER = 'yubi@portfolio'
 const PROMPT_USER_COLOR = 248
 // Make the prompt easy to spot: bold user + sky-blue "$" (matches cursor color).
 // Use 39m/22m to reset color/bold without resetting other terminal attributes.
@@ -106,9 +106,9 @@ export const initialCodeHighlightState = (): CodeHighlightState => ({
   inInlineCode: false,
 })
 
-const CODE_BLOCK_COLOR  = '\x1b[38;5;114m'  // muted green for fenced code blocks
+const CODE_BLOCK_COLOR = '\x1b[38;5;114m'  // muted green for fenced code blocks
 const INLINE_CODE_COLOR = '\x1b[38;5;152m'  // mint/teal for inline code
-const PROSE_COLOR       = '\x1b[38;5;250m'  // normal muted gray for prose
+const PROSE_COLOR = '\x1b[38;5;250m'  // normal muted gray for prose
 
 /**
  * Applies ANSI colour highlighting to a streaming text chunk based on

@@ -55,30 +55,30 @@ export const DARK_XTERM_THEME = {
 export const LIGHT_XTERM_THEME = {
   background: '#fdf6e3',
   foreground: '#657b83',   // base00 — main body text
-  cursor:     '#2aa198',   // Solarized cyan — matches accent
+  cursor: '#2aa198',   // Solarized cyan — matches accent
   selectionBackground: '#93a1a130',
 
   // Remap the 16 standard ANSI colours to Solarized Light values
-  black:         '#073642',
-  red:           '#dc322f',
-  green:         '#859900',
-  yellow:        '#b58900',
-  blue:          '#268bd2',
-  magenta:       '#d33682',
-  cyan:          '#2aa198',
-  white:         '#eee8d5',
-  brightBlack:   '#002b36',
-  brightRed:     '#cb4b16',
-  brightGreen:   '#586e75',
-  brightYellow:  '#657b83',
-  brightBlue:    '#839496',
+  black: '#073642',
+  red: '#dc322f',
+  green: '#859900',
+  yellow: '#b58900',
+  blue: '#268bd2',
+  magenta: '#d33682',
+  cyan: '#2aa198',
+  white: '#eee8d5',
+  brightBlack: '#002b36',
+  brightRed: '#cb4b16',
+  brightGreen: '#586e75',
+  brightYellow: '#657b83',
+  brightBlue: '#839496',
   brightMagenta: '#6c71c4',
-  brightCyan:    '#93a1a1',
-  brightWhite:   '#fdf6e3',
+  brightCyan: '#93a1a1',
+  brightWhite: '#fdf6e3',
 
   // 256-colour overrides — index is the palette number (16–255)
   extendedAnsi: buildExtendedAnsi({
-    81:  '#2aa198',  // logo banner     → Solarized cyan  (same role as dark's cyan)
+    81: '#2aa198',  // logo banner     → Solarized cyan  (same role as dark's cyan)
     114: '#859900',  // code block      → Solarized green
     152: '#2aa198',  // inline code     → Solarized cyan
     203: '#dc322f',  // error red       → Solarized red
@@ -90,7 +90,7 @@ export const LIGHT_XTERM_THEME = {
 }
 
 // Page background (outside the terminal card in light mode)
-export const DARK_BG  = '#101014'
+export const DARK_BG = '#101014'
 export const LIGHT_BG = '#e8e0cc'   // slightly deeper than base3 so the card lifts off
 
 // Terminal card styles per theme
@@ -189,7 +189,7 @@ export const THEMES = {
 
 \x1b[38;5;244m  Software Engineer · Melbourne\x1b[0m
 
-  Type \x1b[1m'help'\x1b[0m to see available commands.
+  Ask about my projects, experience, or skills — or type \x1b[1m'help'\x1b[0m.
 
 `
   }
