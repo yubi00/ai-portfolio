@@ -52,6 +52,7 @@ const AppInner: React.FC = () => {
     <div style={TERMINAL_STYLES.root(bg)}>
       <Header
         voiceOpen={voiceOpen}
+        voiceEnabled={VOICE_ENABLED}
         onVoiceToggle={VOICE_ENABLED ? () => setVoiceOpen(v => !v) : undefined}
       />
       <AboutOverlay visible={aboutVisible} onClose={closeAbout} />
