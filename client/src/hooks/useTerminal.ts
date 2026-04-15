@@ -4,11 +4,10 @@ import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import {
   TERMINAL_CONFIG,
-  THEMES,
   MOBILE_BREAKPOINT,
   MOBILE_FONT_SIZE,
 } from '../config/terminal';
-import { writeToTerminal, writePrompt } from '../utils/terminal';
+import { getWelcomeMessage, writeToTerminal, writePrompt } from '../utils/terminal';
 import { handleCommand as processCommand } from '../utils/inputHandler';
 import { createInputHandler } from './useTerminalInput';
 import { runStreamingPrompt } from './useStreamingResponse';
@@ -16,6 +15,7 @@ import { runStreamingPrompt } from './useStreamingResponse';
 export interface UseTerminalOptions {
   onSessionChange?: (sessionId: string) => void;
   onCommand?: (command: string) => void;
+  voiceEnabled?: boolean;
 }
 
 export const useTerminal = (options: UseTerminalOptions = {}) => {
@@ -54,7 +54,7 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
       }
     });
 
-    writeToTerminal(term, THEMES.matrix.welcome);
+    writeToTerminal(term, getWelcomeMessage(Boolean(options.voiceEnabled)));
     writePrompt(term);
 
     let busy = false;
@@ -145,7 +145,7 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
   const clearTerminal = () => {
     if (!terminal) return;
     terminal.clear();
-    writeToTerminal(terminal, THEMES.matrix.welcome);
+    writeToTerminal(terminal, getWelcomeMessage(Boolean(options.voiceEnabled)));
     writePrompt(terminal);
   };
 

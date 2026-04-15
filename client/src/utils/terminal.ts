@@ -1,15 +1,17 @@
 import { Terminal } from '@xterm/xterm'
 import { getApiBaseUrl } from '../config/env'
+import { THEMES } from '../config/terminal'
 
 // Prompt style: keep it readable but low-noise. Change PROMPT_USER_COLOR to taste.
 // Good options: 245 (muted gray), 110 (soft blue), 108 (muted green), 137 (muted amber).
-const PROMPT_USER = 'yubi@portfolio'
+const PROMPT_USER = 'yubi@yubi.sh'
 const PROMPT_USER_COLOR = 248
 // Make the prompt easy to spot: bold user + sky-blue "$" (matches cursor color).
 // Use 39m/22m to reset color/bold without resetting other terminal attributes.
 const PROMPT = `\x1b[1m\x1b[38;5;${PROMPT_USER_COLOR}m${PROMPT_USER}\x1b[39m \x1b[38;2;147;197;253m$\x1b[0m `
 const ERROR_STYLE = '\x1b[2m\x1b[38;5;203m'
 const RESET = '\x1b[0m'
+const WELCOME_HEADER = `${THEMES.matrix.welcome.split('\n\n  Ask about my projects')[0]}\n\n`
 
 export const writePrompt = (term: Terminal) => {
   term.write(PROMPT)
@@ -17,37 +19,38 @@ export const writePrompt = (term: Terminal) => {
   term.focus()
 }
 
-export const writeIntroMessage = (term: Terminal) => {
+export const getWelcomeMessage = (voiceEnabled = false) => {
+  void voiceEnabled
+  return `${WELCOME_HEADER}  Ask about my projects, experience, or skills - or type \x1b[1m'help'\x1b[0m.\n\n`
+}
+
+export const writeIntroMessage = (term: Terminal, voiceEnabled = false) => {
   term.writeln('')
-  term.writeln('\x1b[1m\x1b[38;5;81mWelcome to Yubi Portfolio Terminal!\x1b[0m')
-  term.writeln('\x1b[1mAsk me anything about my projects, skills and experiences and press Enter.\x1b[0m\r\n')
+  term.write(getWelcomeMessage(voiceEnabled))
   writePrompt(term)
   term.scrollToBottom()
   term.focus()
 }
 
-export const clearTerminalWithIntro = (term: Terminal) => {
+export const clearTerminalWithIntro = (term: Terminal, voiceEnabled = false) => {
   term.clear()
-  writeIntroMessage(term)
+  writeIntroMessage(term, voiceEnabled)
 }
 
-export const writeHelpMessage = (term: Terminal) => {
+export const getHelpMessage = (voiceEnabled = false) => {
   const B = '\x1b[1m'
   const R = '\x1b[0m'
   const D = '\x1b[38;5;244m'
   const S = '\x1b[38;5;238m'
+  const voiceTip = voiceEnabled
+    ? `\r\n${B}Tip${R}\r\n  ${D}Use the mic button above to start a voice conversation.${R}`
+    : ''
 
-  term.writeln('')
-  term.writeln(`${B}Commands${R}  ${S}${'─'.repeat(28)}${R}`)
-  term.writeln(`  ${B}help${R}    ${D}—${R} show this message`)
-  term.writeln(`  ${B}about${R}   ${D}—${R} profile and links`)
-  term.writeln(`  ${B}resume${R}  ${D}—${R} download resume`)
-  term.writeln(`  ${B}clear${R}   ${D}—${R} clear the terminal`)
-  term.writeln('')
-  term.writeln(`${B}Ask me anything:${R}`)
-  term.writeln(`  ${D}"What has Yubi built?"${R}`)
-  term.writeln(`  ${D}"What's Yubi's experience with AI?"${R}`)
-  term.writeln(`  ${D}"Tell me about Yubi's background"${R}`)
+  return `\r\n${B}Commands${R}  ${S}----------------------------${R}\r\n  ${B}help${R}    ${D}-${R} show this message\r\n  ${B}about${R}   ${D}-${R} who is Yubi\r\n  ${B}resume${R}  ${D}-${R} download resume\r\n  ${B}clear${R}   ${D}-${R} clear the terminal\r\n\r\nAsk anything about my work, experience, or skills.\r\n\r\n${B}Examples:${R}\r\n  ${D}"What has Yubi built?"${R}\r\n  ${D}"Tell me about Yubi's AI experience"${R}\r\n  ${D}"What projects are you most proud of?"${R}${voiceTip}\r\n\r\n`
+}
+
+export const writeHelpMessage = (term: Terminal, voiceEnabled = false) => {
+  term.write(getHelpMessage(voiceEnabled))
 }
 
 export const writeErrorMessage = (term: Terminal, message: string) => {
@@ -83,12 +86,12 @@ export const getApiUrl = (): string => {
 }
 
 export const writeToTerminal = (terminal: Terminal, text: string) => {
-  terminal.write(text);
-};
+  terminal.write(text)
+}
 
 export const clearLine = (terminal: Terminal) => {
-  terminal.write('\x1b[2K\r');
-};
+  terminal.write('\x1b[2K\r')
+}
 
 // ---------------------------------------------------------------------------
 // Code-block syntax highlighting (streaming-safe)
@@ -144,12 +147,12 @@ export const applyCodeHighlighting = (
           // Include the newline in the consumed range
           const fenceSlice = input.slice(i, fenceEnd + 1)
           if (inCodeBlock) {
-            // Closing fence — emit it dimmed and switch back to prose
+            // Closing fence - emit it dimmed and switch back to prose
             output += `\x1b[38;5;238m${fenceSlice}\x1b[0m`
             inCodeBlock = false
             inInlineCode = false
           } else {
-            // Opening fence — emit it dimmed and switch to code block colour
+            // Opening fence - emit it dimmed and switch to code block colour
             output += `\x1b[38;5;238m${fenceSlice}\x1b[0m`
             inCodeBlock = true
             inInlineCode = false
@@ -157,13 +160,13 @@ export const applyCodeHighlighting = (
           i = fenceEnd + 1
           continue
         } else {
-          // The fence starts here but no newline yet — we're at the chunk end.
+          // The fence starts here but no newline yet - we're at the chunk end.
           // Buffer the partial fence so the next chunk can complete it.
           fenceBuffer = remaining
           break
         }
       } else if (remaining.length < 3 && remaining.split('').every(c => c === '`')) {
-        // Could be the start of a ``` split across chunks — buffer it
+        // Could be the start of a ``` split across chunks - buffer it
         fenceBuffer = remaining
         break
       } else if (!inCodeBlock) {

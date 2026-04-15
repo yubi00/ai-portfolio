@@ -12,6 +12,11 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ voiceOpen = false, voiceEnabled = false, onVoiceToggle }) => {
   const { isDark, toggle } = useTheme()
   const [showVoiceTooltip, setShowVoiceTooltip] = React.useState(false)
+  const [showThemeTooltip, setShowThemeTooltip] = React.useState(false)
+  const voiceTooltip = voiceEnabled
+    ? (voiceOpen ? 'Close voice chat' : 'Talk to Yubi')
+    : 'Talk to Yubi coming soon'
+  const themeTooltip = isDark ? 'Switch to light mode' : 'Switch to dark mode'
 
   const btnStyle: React.CSSProperties = {
     display: 'flex',
@@ -36,14 +41,30 @@ export const Header: React.FC<HeaderProps> = ({ voiceOpen = false, voiceEnabled 
   const onLeave = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.currentTarget.style.background = 'transparent'
   }
+  const tooltipStyle: React.CSSProperties = {
+    position: 'absolute',
+    top: 'calc(100% + 8px)',
+    right: 0,
+    padding: '6px 8px',
+    borderRadius: 8,
+    fontSize: 11,
+    lineHeight: 1.2,
+    whiteSpace: 'nowrap',
+    color: isDark ? '#e2e8f0' : '#0f172a',
+    background: isDark ? 'rgba(15, 23, 42, 0.96)' : 'rgba(255,255,255,0.98)',
+    border: isDark ? '1px solid rgba(148,163,184,0.18)' : '1px solid rgba(15,23,42,0.10)',
+    boxShadow: isDark ? '0 8px 24px rgba(0,0,0,0.45)' : '0 8px 24px rgba(0,0,0,0.12)',
+    pointerEvents: 'none',
+    zIndex: 30,
+  }
 
   return (
     <div style={{ ...TERMINAL_STYLES.header(isDark), gap: 6 }}>
       {/* Mic / voice toggle */}
       <div
         style={{ position: 'relative', display: 'flex' }}
-        onMouseEnter={!voiceEnabled ? () => setShowVoiceTooltip(true) : undefined}
-        onMouseLeave={!voiceEnabled ? () => setShowVoiceTooltip(false) : undefined}
+        onMouseEnter={() => setShowVoiceTooltip(true)}
+        onMouseLeave={() => setShowVoiceTooltip(false)}
       >
         <button
           onClick={onVoiceToggle}
@@ -70,47 +91,46 @@ export const Header: React.FC<HeaderProps> = ({ voiceOpen = false, voiceEnabled 
           }}
           onMouseEnter={voiceEnabled ? onEnter : undefined}
           onMouseLeave={voiceEnabled ? onLeave : undefined}
-          onFocus={!voiceEnabled ? () => setShowVoiceTooltip(true) : undefined}
-          onBlur={!voiceEnabled ? () => setShowVoiceTooltip(false) : undefined}
+          onFocus={() => setShowVoiceTooltip(true)}
+          onBlur={() => setShowVoiceTooltip(false)}
         >
           {voiceOpen ? <MicOff size={15} strokeWidth={1.8} /> : <Mic size={15} strokeWidth={1.8} />}
         </button>
 
-        {!voiceEnabled && showVoiceTooltip && (
+        {showVoiceTooltip && (
           <div
             role="tooltip"
-            style={{
-              position: 'absolute',
-              top: 'calc(100% + 8px)',
-              right: 0,
-              padding: '6px 8px',
-              borderRadius: 8,
-              fontSize: 11,
-              lineHeight: 1.2,
-              whiteSpace: 'nowrap',
-              color: isDark ? '#e2e8f0' : '#0f172a',
-              background: isDark ? 'rgba(15, 23, 42, 0.96)' : 'rgba(255,255,255,0.98)',
-              border: isDark ? '1px solid rgba(148,163,184,0.18)' : '1px solid rgba(15,23,42,0.10)',
-              boxShadow: isDark ? '0 8px 24px rgba(0,0,0,0.45)' : '0 8px 24px rgba(0,0,0,0.12)',
-              pointerEvents: 'none',
-              zIndex: 30,
-            }}
+            style={tooltipStyle}
           >
-            Talk to Yubi coming soon
+            {voiceTooltip}
           </div>
         )}
       </div>
 
       {/* Theme toggle */}
-      <button
-        onClick={toggle}
-        title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-        style={btnStyle}
-        onMouseEnter={onEnter}
-        onMouseLeave={onLeave}
+      <div
+        style={{ position: 'relative', display: 'flex' }}
+        onMouseEnter={() => setShowThemeTooltip(true)}
+        onMouseLeave={() => setShowThemeTooltip(false)}
       >
-        {isDark ? <Sun size={15} strokeWidth={1.8} /> : <Moon size={15} strokeWidth={1.8} />}
-      </button>
+        <button
+          onClick={toggle}
+          aria-label={themeTooltip}
+          style={btnStyle}
+          onMouseEnter={onEnter}
+          onMouseLeave={onLeave}
+          onFocus={() => setShowThemeTooltip(true)}
+          onBlur={() => setShowThemeTooltip(false)}
+        >
+          {isDark ? <Sun size={15} strokeWidth={1.8} /> : <Moon size={15} strokeWidth={1.8} />}
+        </button>
+
+        {showThemeTooltip && (
+          <div role="tooltip" style={tooltipStyle}>
+            {themeTooltip}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

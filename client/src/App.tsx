@@ -21,6 +21,7 @@ const AppInner: React.FC = () => {
   const [voiceOpen, setVoiceOpen] = useState(false);
 
   const { terminalRef, terminal } = useTerminal({
+    voiceEnabled: VOICE_ENABLED,
     onCommand: (command) => {
       const trimmed = command.trim().toLowerCase();
       if (trimmed === 'about') {
