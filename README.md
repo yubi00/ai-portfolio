@@ -51,7 +51,7 @@ Set these in `client/.env` (dev) or Vercel (prod):
 | `VITE_VOICE_ENABLED` | Enables the voice UI when set to `true`. Defaults to `false`. |
 | `VITE_VOICE_WS_URL` | Voice service WebSocket URL. Optional until the voice service is deployed. |
 | `VITE_TURNSTILE_SITE_KEY` | Cloudflare Turnstile site key |
-| `VITE_REQUIRE_AUTH` | Enables the existing FastAPI short-lived token flow. When voice auth is enabled on the backend, the voice UI reuses this flow before opening `/ws`. |
+| `VITE_REQUIRE_AUTH` | Enables the current FastAPI auth flow. The frontend lazily mints a short-lived access token only when a protected action needs it. When voice auth is enabled on the backend, the voice UI reuses this flow before opening `/ws`. |
 | `VITE_DISABLE_AUTH` | Kill switch — keep `false` in prod |
 
 ## Deployment
@@ -79,6 +79,15 @@ Browser (xterm.js)
 ```
 
 AI responses stream token-by-token via SSE. Code blocks in responses are syntax-highlighted in the terminal.
+
+## Auth Flow
+
+- The frontend does not call auth endpoints on page load by default.
+- On the first protected action, it first tries `POST /auth/token` with `credentials: "include"` to silently recover from an existing HttpOnly grant cookie.
+- If that first `/auth/token` call fails because there is no valid grant cookie yet, the frontend runs Turnstile, calls `POST /auth/session`, and then retries `POST /auth/token`.
+- `/prompt` and `/prompt/stream` still send `Authorization: Bearer <access_token>`.
+- The access token is stored in memory only and is lost on page reload.
+- The initial cold-start `/auth/token` failure is expected control flow, not a bug.
 
 ## UI
 

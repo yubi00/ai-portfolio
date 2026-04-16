@@ -365,6 +365,31 @@ FastAPI backend is currently on Render's paid Starter plan. Goal is to move to f
 
 This is also a great learning area that maps directly to production MCP deployments at FSAI.
 
+### Frontend Auth Update - Current Implemented Behavior
+
+This update supersedes the older token-storage notes below where they conflict.
+
+Current implemented behavior:
+- `POST /auth/session` verifies Turnstile and sets the grant token as an **HttpOnly, Secure, SameSite=None cookie**
+- `POST /auth/token` reads that grant cookie server-side and returns `{ "access_token": "...", "expires_in": 60 }`
+- the frontend stores the **access token in memory only**
+- the frontend does **not** persist auth tokens in `localStorage`
+- `/prompt` and `/prompt/stream` still use `Authorization: Bearer <access_token>`
+
+Runtime flow:
+- No auth call runs on page load by default
+- On the first protected action, the frontend first tries `POST /auth/token` with `credentials: "include"`
+- If that first `/auth/token` call fails because there is no valid grant cookie yet, that is expected control flow
+- The frontend then runs Turnstile, calls `POST /auth/session`, and retries `POST /auth/token`
+- If the grant cookie is still valid after a page reload, the next protected action silently recovers by calling `POST /auth/token` again
+- The access token is memory-only and is intentionally lost on reload
+
+Cross-origin cookie constraints still apply:
+- the grant cookie requires `SameSite=None; Secure`
+- frontend auth fetches must use `credentials: "include"`
+- real environments must be HTTPS for the secure cookie to persist
+- local plain-HTTP development can still fail to persist the secure grant cookie even when frontend control flow is correct
+
 ---
 
 ### Frontend Token Storage — httpOnly Cookies vs localStorage
