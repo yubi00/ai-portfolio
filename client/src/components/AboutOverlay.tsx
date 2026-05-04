@@ -132,12 +132,12 @@ export const AboutOverlay: React.FC<AboutOverlayProps> = ({ visible, onClose }) 
               <div>
                 <span style={{ opacity: dimText }}>Portfolio:</span>{' '}
                 <a
-                  href="https://yubikhadka.com"
+                  href="https://yubi.sh"
                   target="_blank"
                   rel="noreferrer"
                   style={{ color: primary, textDecoration: 'none' }}
                 >
-                  yubikhadka.com
+                  yubi.sh
                 </a>
               </div>
               <div>
