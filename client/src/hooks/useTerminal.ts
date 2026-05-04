@@ -127,14 +127,24 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
     };
 
     const handleOrientation = () => setTimeout(handleResize, 150);
+    const handleViewportChange = () => {
+      setTimeout(() => {
+        handleResize();
+        terminal.scrollToBottom();
+      }, 50);
+    };
 
     window.addEventListener('resize', handleResize);
     window.addEventListener('orientationchange', handleOrientation);
+    window.visualViewport?.addEventListener('resize', handleViewportChange);
+    window.visualViewport?.addEventListener('scroll', handleViewportChange);
 
     return () => {
       if (raf) cancelAnimationFrame(raf);
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('orientationchange', handleOrientation);
+      window.visualViewport?.removeEventListener('resize', handleViewportChange);
+      window.visualViewport?.removeEventListener('scroll', handleViewportChange);
     };
   }, [terminal, fitAddon]);
 

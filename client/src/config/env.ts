@@ -14,7 +14,7 @@ export const getApiBaseUrl = (): string => {
 
   // Local dev default (Vite)
   if (typeof window !== 'undefined' && window.location?.port === '5173') {
-    return 'http://127.0.0.1:9000';
+    return 'http://127.0.0.1:8000';
   }
 
   // Deployed frontend (Vercel) typically proxies to /api

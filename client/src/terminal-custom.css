@@ -24,6 +24,21 @@
   position: relative;
 }
 
+.terminal-bottom-spacer {
+  height: 20px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .terminal-outer-container {
+    padding: 10px 8px 8px 8px;
+  }
+
+  .terminal-bottom-spacer {
+    height: max(8px, env(safe-area-inset-bottom));
+  }
+}
+
 /* Hide scrollbar visually but keep scrolling functional */
 .xterm .xterm-viewport::-webkit-scrollbar {
   width: 0 !important;

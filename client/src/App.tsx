@@ -38,6 +38,26 @@ const AppInner: React.FC = () => {
     terminal.options.theme = isDark ? DARK_XTERM_THEME : LIGHT_XTERM_THEME;
   }, [terminal, isDark]);
 
+  // Mobile browsers keep changing the visual viewport as browser chrome and
+  // the keyboard appear. Use the visible height so the prompt remains reachable.
+  useEffect(() => {
+    const setAppHeight = () => {
+      const height = window.visualViewport?.height ?? window.innerHeight;
+      document.documentElement.style.setProperty('--app-height', `${height}px`);
+    };
+
+    setAppHeight();
+    window.addEventListener('resize', setAppHeight);
+    window.visualViewport?.addEventListener('resize', setAppHeight);
+    window.visualViewport?.addEventListener('scroll', setAppHeight);
+
+    return () => {
+      window.removeEventListener('resize', setAppHeight);
+      window.visualViewport?.removeEventListener('resize', setAppHeight);
+      window.visualViewport?.removeEventListener('scroll', setAppHeight);
+    };
+  }, []);
+
   const closeAbout = () => {
     setAboutVisible(false);
     window.setTimeout(() => {

@@ -26,7 +26,7 @@ export const TerminalContainer: React.FC<TerminalContainerProps> = ({ terminalRe
       >
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', width: '100%' }}>
           <div ref={terminalRef} style={{ flex: 1, minHeight: 0, width: '100%' }} />
-          <div style={{ height: 20, flexShrink: 0 }} />
+          <div className="terminal-bottom-spacer" />
         </div>
       </div>
     </div>
