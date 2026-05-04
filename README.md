@@ -145,16 +145,28 @@ VITE_VOICE_WS_URL=wss://<voice-service-host>/ws
 
 ## Architecture
 
-```text
-Browser
-  -> React + xterm.js terminal
-  -> /prompt/stream SSE or /prompt JSON
-  -> portfolio-assistant-langgraph
-  -> LangGraph retrieval, memory, auth, and answer generation
+```mermaid
+flowchart LR
+  User[Visitor] --> UI[React terminal UI]
+  UI --> XTerm[xterm.js]
+  UI --> Auth[Browser auth client]
+  Auth -->|POST /auth/session + /auth/token| API[portfolio-assistant-langgraph]
+  UI -->|POST /prompt/stream SSE| API
+  UI -->|POST /prompt JSON fallback| API
+  API --> Graph[LangGraph workflow]
+  Graph --> Retrieval[Portfolio retrieval]
+  Graph --> Memory[Session memory]
+  Graph --> LLM[OpenAI]
+  Graph --> API
+  API -->|answer chunks + suggestions| UI
+```
 
-Optional voice:
-Browser
-  -> WebSocket /ws?access_token=...
-  -> yubi-portfolio-voice-service
-  -> OpenAI voice pipeline
+```mermaid
+flowchart LR
+  User[Visitor] --> VoiceUI[Voice panel]
+  VoiceUI -->|get access token| API[portfolio-assistant-langgraph]
+  VoiceUI -->|WebSocket /ws?access_token=...| Voice[yubi-portfolio-voice-service]
+  Voice --> Realtime[OpenAI voice pipeline]
+  Realtime --> Voice
+  Voice -->|audio + transcript events| VoiceUI
 ```
