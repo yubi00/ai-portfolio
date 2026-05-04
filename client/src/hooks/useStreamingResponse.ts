@@ -20,17 +20,17 @@ const STATUS_RESET = '\x1b[0m'
 const DOTS = ['   ', '.  ', '.. ', '...']
 
 const STATUS_LABELS: Record<string, string> = {
-  resolve_context: 'understanding your question',
-  classify_relevance: 'checking portfolio relevance',
-  check_ambiguity: 'clarifying intent',
-  plan_retrieval: 'choosing the right sources',
-  retrieve_projects: 'looking through project details',
-  retrieve_resume: 'checking resume background',
-  retrieve_docs: 'checking supporting notes',
-  merge_normalize_context: 'preparing context',
-  generate_answer: 'writing response',
-  resolving_context: 'understanding your question',
-  summarizing: 'writing response',
+  resolve_context: 'understanding context',
+  classify_relevance: 'understanding context',
+  check_ambiguity: 'understanding context',
+  plan_retrieval: 'understanding context',
+  retrieve_projects: 'thinking',
+  retrieve_resume: 'thinking',
+  retrieve_docs: 'thinking',
+  merge_normalize_context: 'thinking',
+  generate_answer: 'composing reply',
+  resolving_context: 'understanding context',
+  summarizing: 'composing reply',
   friendly_chat: 'thinking',
 }
 
