@@ -1,95 +1,160 @@
-# yubi.ai
+# yubi.sh
 
-Terminal-style AI portfolio for [yubikhadka.com](https://yubikhadka.com). Visitors interact with an LLM-powered assistant to explore Yubi's projects, skills, and background through a full-screen terminal interface.
+```text
+██╗   ██╗██╗   ██╗██████╗ ██╗
+╚██╗ ██╔╝██║   ██║██╔══██╗██║
+ ╚████╔╝ ██║   ██║██████╔╝██║
+  ╚██╔╝  ██║   ██║██╔══██╗██║
+   ██║   ╚██████╔╝██████╔╝██║
+   ╚═╝    ╚═════╝ ╚═════╝ ╚═╝
+```
+
+Terminal-style AI portfolio for [yubi.sh](https://yubi.sh). Visitors can ask about Yubi's projects, experience, skills, and background through a full-screen xterm.js interface, with optional voice conversation support.
+
+This repository is the frontend only. The LangGraph/FastAPI assistant backend lives in the separate `portfolio-assistant-langgraph` project, and the voice WebSocket backend lives in the separate `yubi-portfolio-voice-service` project.
 
 ## Stack
 
 | Layer | Tech |
 |-------|------|
 | Frontend | React + Vite + TypeScript |
-| Terminal | xterm.js (`@xterm/*`) |
-| Auth / Bot protection | Cloudflare Turnstile + short-lived token chain |
-| Backend (separate repo) | FastAPI + MCP server |
-| Hosting | Vercel (frontend) · Render (backend) |
+| Terminal | xterm.js |
+| Text API | LangGraph FastAPI backend over JSON + SSE |
+| Auth | Cloudflare Turnstile, HttpOnly refresh cookie, in-memory access token |
+| Voice | Separate WebSocket voice service |
+| Hosting | Vercel |
+
+## Features
+
+- Terminal-style portfolio UI with dark/light themes.
+- Streaming AI answers from `POST /prompt/stream`.
+- Non-streaming fallback through `POST /prompt`.
+- Follow-up session support via `session_id`.
+- Suggested follow-up prompts rendered after completed answers.
+- Production-ready browser auth flow for protected APIs.
+- Optional voice chat via `VITE_VOICE_ENABLED`.
+- Mobile viewport handling so the prompt remains reachable after long output.
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `help` | Show available commands |
+| `help` | Show available commands and examples |
 | `about` | Open profile card |
-| `resume` | Open resume in a new tab |
+| `resume` | Open resume PDF |
 | `clear` | Clear the terminal |
-| _anything else_ | AI conversation |
+| anything else | Ask the portfolio assistant |
 
 ## Local Development
+
+Install and run the frontend:
 
 ```bash
 cd client
 npm install
 npm run dev
-# → http://localhost:5173
 ```
 
-Copy `client/.env.example` to `client/.env` and fill in the values.
+The app runs at:
+
+```text
+http://localhost:5173
+```
+
+For local text chat, run `portfolio-assistant-langgraph` separately, usually on:
+
+```text
+http://localhost:8000
+```
+
+For local voice chat, run `yubi-portfolio-voice-service` separately, usually on:
+
+```text
+ws://127.0.0.1:3001/ws
+```
+
+## Environment
+
+Copy `client/.env.example` to `client/.env`.
+
+| Variable | Description |
+|----------|-------------|
+| `VITE_API_URL` | LangGraph API base URL. Local default is `http://localhost:8000`. |
+| `VITE_REQUIRE_AUTH` | When `true`, prompt and voice calls require an access token. |
+| `VITE_DISABLE_AUTH` | Emergency auth kill switch. Keep `false` in production. |
+| `VITE_TURNSTILE_SITE_KEY` | Cloudflare Turnstile site key. |
+| `VITE_TURNSTILE_DEV_BYPASS` | Sends a dummy Turnstile token in dev. Requires backend `TURNSTILE_BYPASS=true`. |
+| `VITE_VOICE_ENABLED` | Enables the voice UI when `true`. |
+| `VITE_VOICE_WS_URL` | Voice WebSocket URL. Defaults locally to `ws://127.0.0.1:3001/ws`. |
+| `VITE_DEV_HTTPS` | Runs Vite over HTTPS in development when `true`. |
+
+## Auth Flow
+
+When auth is enabled, the frontend:
+
+1. Calls `POST /auth/token` with `credentials: "include"`.
+2. If the refresh cookie is missing, runs Turnstile.
+3. Calls `POST /auth/session` with the Turnstile token.
+4. Calls `POST /auth/token` again.
+5. Sends `Authorization: Bearer <access_token>` to `/prompt`, `/prompt/stream`, and the voice WebSocket.
+
+Access tokens are stored in memory only. Refresh state stays in the backend-managed HttpOnly cookie.
 
 ## Build
 
 ```bash
 cd client
 npm run build
-# output: client/dist/
 ```
 
-## Environment Variables
+Output:
 
-Set these in `client/.env` (dev) or Vercel (prod):
-
-| Variable | Description |
-|----------|-------------|
-| `VITE_API_URL` | Backend API base URL (no trailing slash) |
-| `VITE_VOICE_ENABLED` | Enables the voice UI when set to `true`. Defaults to `false`. |
-| `VITE_VOICE_WS_URL` | Voice service WebSocket URL. Optional until the voice service is deployed. |
-| `VITE_TURNSTILE_SITE_KEY` | Cloudflare Turnstile site key |
-| `VITE_REQUIRE_AUTH` | Enables the current FastAPI auth flow. The frontend lazily mints a short-lived access token only when a protected action needs it. When voice auth is enabled on the backend, the voice UI reuses this flow before opening `/ws`. |
-| `VITE_DISABLE_AUTH` | Kill switch — keep `false` in prod |
+```text
+client/dist
+```
 
 ## Deployment
 
-Vercel is configured via `vercel.json`:
-- **Build:** `cd client && npm ci && npm run build`
-- **Output:** `client/dist`
+Vercel uses the root `vercel.json`:
 
-Set the env vars above in Vercel → Project Settings → Environment Variables.
+```json
+{
+  "installCommand": "cd client && npm ci",
+  "buildCommand": "cd client && npm run build",
+  "outputDirectory": "client/dist",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
+```
 
-Voice rollout is gated on the frontend:
-- Leave `VITE_VOICE_ENABLED` unset or `false` until the separate voice service is deployed.
-- Once the voice backend is live, set `VITE_VOICE_ENABLED=true` and provide `VITE_VOICE_WS_URL` if the WebSocket endpoint is not proxied from the same host.
-- If the voice backend has `REQUIRE_AUTH=true`, keep `VITE_REQUIRE_AUTH=true` so the frontend fetches a FastAPI-issued short-lived access token and connects to `/ws?access_token=<token>`.
+Set production environment variables in Vercel. At minimum:
+
+```text
+VITE_API_URL=https://<langgraph-api-host>
+VITE_REQUIRE_AUTH=true
+VITE_TURNSTILE_SITE_KEY=<site-key>
+```
+
+Enable voice only when the voice backend is deployed:
+
+```text
+VITE_VOICE_ENABLED=true
+VITE_VOICE_WS_URL=wss://<voice-service-host>/ws
+```
 
 ## Architecture
 
+```text
+Browser
+  -> React + xterm.js terminal
+  -> /prompt/stream SSE or /prompt JSON
+  -> portfolio-assistant-langgraph
+  -> LangGraph retrieval, memory, auth, and answer generation
+
+Optional voice:
+Browser
+  -> WebSocket /ws?access_token=...
+  -> yubi-portfolio-voice-service
+  -> OpenAI voice pipeline
 ```
-Browser (xterm.js)
-  └── useTerminal hook
-        ├── built-in commands (help, about, resume, clear)
-        └── AI prompts → POST /prompt/stream (SSE)
-                            └── FastAPI backend (separate repo)
-                                  └── MCP server → portfolio tools
-```
-
-AI responses stream token-by-token via SSE. Code blocks in responses are syntax-highlighted in the terminal.
-
-## Auth Flow
-
-- The frontend does not call auth endpoints on page load by default.
-- On the first protected action, it first tries `POST /auth/token` with `credentials: "include"` to silently recover from an existing HttpOnly grant cookie.
-- If that first `/auth/token` call fails because there is no valid grant cookie yet, the frontend runs Turnstile, calls `POST /auth/session`, and then retries `POST /auth/token`.
-- `/prompt` and `/prompt/stream` still send `Authorization: Bearer <access_token>`.
-- The access token is stored in memory only and is lost on page reload.
-- The initial cold-start `/auth/token` failure is expected control flow, not a bug.
-
-## UI
-
-- **Dark / light theme** — toggle in the top-right corner (Sun/Moon icon); preference persisted in `localStorage`. Light theme uses Solarized Light palette (cream background, cyan accent).
-- **Resume** — `resume.pdf` served from `client/public/`; opened directly in a new tab via the `resume` command.
