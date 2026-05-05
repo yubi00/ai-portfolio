@@ -113,6 +113,8 @@ export const LIGHT_CARD_STYLE = {
 export const TERMINAL_CONFIG = {
   cursorBlink: true,
   cursorStyle: 'bar' as const,
+  cursorInactiveStyle: 'bar' as const,
+  cursorWidth: 1,
   convertEol: true,
   fontFamily:
     'JetBrains Mono, Fira Mono, Roboto Mono, ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace',
@@ -135,7 +137,7 @@ export const TERMINAL_STYLES = {
     top: 0,
     left: 0,
     right: 0,
-    bottom: 0,
+    height: 'var(--app-height, 100dvh)',
     margin: 0,
     padding: 0,
     border: 'none',
@@ -187,9 +189,7 @@ export const THEMES = {
 \x1b[1m\x1b[38;5;81m   ██║   ╚██████╔╝██████╔╝██║\x1b[0m
 \x1b[1m\x1b[38;5;81m   ╚═╝    ╚═════╝ ╚═════╝ ╚═╝\x1b[0m
 
-\x1b[38;5;244m  Software Engineer · Melbourne\x1b[0m
-
-  Ask about my projects, experience, or skills — or type \x1b[1m'help'\x1b[0m.
+\x1b[38;5;244mTalk to Yubi - my work, projects, and experience in conversation\x1b[0m
 
 `
   }

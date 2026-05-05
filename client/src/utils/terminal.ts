@@ -11,7 +11,7 @@ const PROMPT_USER_COLOR = 248
 const PROMPT = `\x1b[1m\x1b[38;5;${PROMPT_USER_COLOR}m${PROMPT_USER}\x1b[39m \x1b[38;2;147;197;253m$\x1b[0m `
 const ERROR_STYLE = '\x1b[2m\x1b[38;5;203m'
 const RESET = '\x1b[0m'
-const WELCOME_HEADER = `${THEMES.matrix.welcome.split('\n\n  Ask about my projects')[0]}\n\n`
+const WELCOME_HEADER = THEMES.matrix.welcome
 
 export const writePrompt = (term: Terminal) => {
   term.write(PROMPT)
@@ -21,7 +21,7 @@ export const writePrompt = (term: Terminal) => {
 
 export const getWelcomeMessage = (voiceEnabled = false) => {
   void voiceEnabled
-  return `${WELCOME_HEADER}  Ask about my projects, experience, or skills - or type \x1b[1m'help'\x1b[0m.\n\n`
+  return `${WELCOME_HEADER}\x1b[2m\x1b[38;5;244mType 'help' for commands.\x1b[0m\n\n`
 }
 
 export const writeIntroMessage = (term: Terminal, voiceEnabled = false) => {

@@ -1,18 +1,22 @@
 import { getApiBaseUrl } from '../../config/env';
 import type { TokenBundle } from './types';
 
-const parseDetail = async (response: Response): Promise<string> => {
+const parseError = async (response: Response): Promise<{ code?: string; message?: string }> => {
   try {
     const json = await response.json();
-    return json?.detail ? String(json.detail) : '';
+    return {
+      code: json?.error?.code ? String(json.error.code) : undefined,
+      message: json?.error?.message ? String(json.error.message) : undefined,
+    };
   } catch {
-    return '';
+    return {};
   }
 };
 
 const buildHttpError = async (prefix: string, response: Response): Promise<Error> => {
-  const detail = await parseDetail(response);
-  return new Error(detail ? `${prefix}_${response.status}:${detail}` : `${prefix}_${response.status}`);
+  const apiError = await parseError(response);
+  const suffix = apiError.code || response.status;
+  return new Error(apiError.message ? `${prefix}_${suffix}:${apiError.message}` : `${prefix}_${suffix}`);
 };
 
 export const mintAccessToken = async (opts?: {
