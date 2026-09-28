@@ -25,8 +25,10 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const commandRunnerRef = useRef<((command: string) => Promise<void>) | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const busyRef = useRef(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [suggestedPrompts, setSuggestedPrompts] = useState<string[]>([]);
   const [fitAddon] = useState(() => new FitAddon());
   const [webLinksAddon] = useState(() => new WebLinksAddon());
 
@@ -68,6 +70,9 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
     writePrompt(term);
 
     const handleCommand = async (command: string) => {
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+      setSuggestedPrompts([]);
       options.onCommand?.(command);
       busyRef.current = true;
       setIsLoading(true);
@@ -86,12 +91,14 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
               setSessionId(id);
               options.onSessionChange?.(id);
             },
-          });
+            onSuggestedPrompts: setSuggestedPrompts,
+          }, controller.signal);
         } else {
           console.error('Error processing command:', error);
           writeToTerminal(term, 'Error: Failed to process command');
         }
       } finally {
+        if (abortControllerRef.current === controller) abortControllerRef.current = null;
         setIsLoading(false);
         busyRef.current = false;
       }
@@ -106,15 +113,37 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
       (s) => setInputState(s),
       handleCommand,
       () => busyRef.current,
+      () => abortControllerRef.current?.abort(),
       () => { fontFitDone = true },
     );
+
+    // Browsers may reserve Ctrl+C for copy before xterm emits terminal data.
+    // Capture it while a response is active and the terminal owns focus.
+    const handleCancelShortcut = (event: KeyboardEvent) => {
+      if (
+        event.type === 'keydown' &&
+        event.ctrlKey &&
+        event.key.toLowerCase() === 'c' &&
+        busyRef.current &&
+        !term.hasSelection() &&
+        term.element?.contains(event.target as Node)
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        handleData('\u0003');
+      }
+    };
+    window.addEventListener('keydown', handleCancelShortcut, true);
 
     term.onData(handleData);
     setTerminal(term);
 
     return () => {
       resizeObserver.disconnect();
+      window.removeEventListener('keydown', handleCancelShortcut, true);
       if (containerFitFrame) cancelAnimationFrame(containerFitFrame);
+      abortControllerRef.current?.abort();
+      abortControllerRef.current = null;
       commandRunnerRef.current = null;
       busyRef.current = false;
       term.dispose();
@@ -177,6 +206,7 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
 
   const resetSession = () => {
     setSessionId(null);
+    setSuggestedPrompts([]);
     sessionIdRef.current = null;
     setInputState({ current: '', cursorPos: 0 });
     options.onSessionChange?.('');
@@ -201,6 +231,7 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
     currentInput: inputState.current,
     sessionId,
     isLoading,
+    suggestedPrompts,
     clearTerminal,
     resetSession,
     submitCommand,

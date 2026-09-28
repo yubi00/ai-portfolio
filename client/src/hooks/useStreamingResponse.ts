@@ -9,6 +9,7 @@ import { getAuthorizationHeader } from '../utils/auth'
 
 export interface StreamingCallbacks {
   onSessionId: (id: string) => void
+  onSuggestedPrompts?: (prompts: string[]) => void
 }
 
 // ---------------------------------------------------------------------------
@@ -117,14 +118,16 @@ const WRAP_RIGHT_MARGIN = 1
 
 const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
 
-const suggestedPromptLines = (suggestions: unknown): string[] => {
+const throwIfAborted = (signal?: AbortSignal) => {
+  if (signal?.aborted) throw new DOMException('The operation was aborted.', 'AbortError')
+}
+
+const isAbortError = (error: unknown) =>
+  error instanceof Error && error.name === 'AbortError'
+
+const cleanSuggestedPrompts = (suggestions: unknown): string[] => {
   if (!Array.isArray(suggestions)) return []
-  const clean = suggestions.map((s) => String(s).trim()).filter(Boolean)
-  if (clean.length === 0) return []
-  return [
-    '\x1b[2m\x1b[38;5;244mSuggested follow-ups:\x1b[0m',
-    ...clean.map((s) => `\x1b[2m\x1b[38;5;244m- ${s}\x1b[0m`),
-  ]
+  return [...new Set(suggestions.map((s) => String(s).trim()).filter(Boolean))].slice(0, 3)
 }
 
 const parseApiError = async (response: Response): Promise<string> => {
@@ -162,6 +165,7 @@ export const runStreamingPrompt = async (
   sessionIdRef: React.MutableRefObject<string | null>,
   term: Terminal,
   callbacks: StreamingCallbacks,
+  signal?: AbortSignal,
 ): Promise<void> => {
   term.writeln('')
   term.scrollToBottom()
@@ -169,6 +173,8 @@ export const runStreamingPrompt = async (
 
   const animation = createStatusAnimation(term)
   animation.start('thinking')
+  const clearOnAbort = () => animation.clear()
+  signal?.addEventListener('abort', clearOnAbort, { once: true })
 
   const payload: { prompt: string; session_id?: string } = { prompt: command }
   const currentSessionId = sessionIdRef.current || sessionId
@@ -184,11 +190,13 @@ export const runStreamingPrompt = async (
     }
     const authHeader = await getAuthorizationHeader({ enforce: requireAuth })
     if (authHeader) headers.Authorization = authHeader
+    throwIfAborted(signal)
 
     const res = await fetch(`${apiUrl}/prompt/stream`, {
       method: 'POST',
       headers,
       body: JSON.stringify(payload),
+      signal,
     })
 
     if (!res.ok) {
@@ -203,10 +211,12 @@ export const runStreamingPrompt = async (
       return
     }
 
-    await readStream(res, term, animation, callbacks, sessionIdRef)
+    await readStream(res, term, animation, callbacks, sessionIdRef, signal)
   } catch (error) {
     animation.clear()
-    term.writeln(errorLine(sanitizeThrownError(error)))
+    if (!isAbortError(error)) term.writeln(errorLine(sanitizeThrownError(error)))
+  } finally {
+    signal?.removeEventListener('abort', clearOnAbort)
   }
 }
 
@@ -220,6 +230,7 @@ const readStream = async (
   animation: ReturnType<typeof createStatusAnimation>,
   callbacks: StreamingCallbacks,
   sessionIdRef: React.MutableRefObject<string | null>,
+  signal?: AbortSignal,
 ): Promise<void> => {
   const reader = res.body!.getReader()
   const decoder = new TextDecoder()
@@ -307,6 +318,7 @@ const readStream = async (
 
   const writeAnswerText = async (text: string, flushEnd = false) => {
     for (let i = 0; i < text.length; i += PLAYBACK_CHUNK_CHARS) {
+      throwIfAborted(signal)
       const part = text.slice(i, i + PLAYBACK_CHUNK_CHARS)
       for (const char of part) {
         if (/\s/.test(char)) {
@@ -317,6 +329,7 @@ const readStream = async (
         }
       }
       await delay(PLAYBACK_DELAY_MS)
+      throwIfAborted(signal)
     }
     if (flushEnd) flushPendingWord()
   }
@@ -354,12 +367,7 @@ const readStream = async (
         callbacks.onSessionId(payload.session_id)
         sessionIdRef.current = payload.session_id
       }
-      const suggestions = suggestedPromptLines(payload?.suggested_prompts)
-      if (suggestions.length > 0) {
-        term.writeln('')
-        term.writeln('')
-        suggestions.forEach((line) => term.writeln(line))
-      }
+      callbacks.onSuggestedPrompts?.(cleanSuggestedPrompts(payload?.suggested_prompts))
       term.writeln('')
       term.writeln('')
       completedAnswer = true
@@ -374,6 +382,7 @@ const readStream = async (
   }
 
   while (true) {
+    throwIfAborted(signal)
     const { value, done } = await reader.read()
     if (done) break
     buffer += decoder.decode(value, { stream: true })

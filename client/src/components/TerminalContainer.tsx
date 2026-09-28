@@ -5,7 +5,9 @@ interface TerminalContainerProps {
   terminalRef: React.RefObject<HTMLDivElement>;
   topOffset: number;
   isDark: boolean;
-  starterPrompts: string[];
+  prompts: string[];
+  promptLabel: string;
+  promptPlaceholder: string;
   promptsDisabled: boolean;
   onPromptSelect: (prompt: string) => boolean;
 }
@@ -14,7 +16,9 @@ export const TerminalContainer: React.FC<TerminalContainerProps> = ({
   terminalRef,
   topOffset,
   isDark,
-  starterPrompts,
+  prompts,
+  promptLabel,
+  promptPlaceholder,
   promptsDisabled,
   onPromptSelect,
 }) => {
@@ -40,8 +44,8 @@ export const TerminalContainer: React.FC<TerminalContainerProps> = ({
             <span className="terminal-status-dot" aria-hidden="true" />
             <span>Ask Yubi</span>
           </div>
-          <div className="starter-prompts starter-prompts-desktop" aria-label="Suggested questions">
-            {starterPrompts.map((prompt) => (
+          <div className="starter-prompts starter-prompts-desktop" aria-label={promptLabel}>
+            {prompts.map((prompt) => (
               <button
                 key={prompt}
                 type="button"
@@ -55,16 +59,16 @@ export const TerminalContainer: React.FC<TerminalContainerProps> = ({
           </div>
           <select
             className="starter-prompt-select"
-            aria-label="Choose a suggested question"
-            defaultValue=""
+            aria-label={promptLabel}
+            value=""
             disabled={promptsDisabled}
             onChange={(event) => {
               const prompt = event.currentTarget.value;
               if (prompt && onPromptSelect(prompt)) event.currentTarget.value = '';
             }}
           >
-            <option value="" disabled>Try a suggested question...</option>
-            {starterPrompts.map((prompt) => (
+            <option value="" disabled>{promptPlaceholder}</option>
+            {prompts.map((prompt) => (
               <option key={prompt} value={prompt}>{prompt}</option>
             ))}
           </select>

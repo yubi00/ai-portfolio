@@ -25,7 +25,7 @@ const AppInner: React.FC = () => {
   const [aboutVisible, setAboutVisible] = useState(false);
   const [voiceOpen, setVoiceOpen] = useState(false);
 
-  const { terminalRef, terminal, currentInput, isLoading, submitCommand } = useTerminal({
+  const { terminalRef, terminal, currentInput, isLoading, suggestedPrompts, submitCommand } = useTerminal({
     voiceEnabled: VOICE_ENABLED,
     onCommand: (command) => {
       const trimmed = command.trim().toLowerCase();
@@ -69,6 +69,8 @@ const AppInner: React.FC = () => {
 
   const bg = isDark ? DARK_BG : LIGHT_BG;
   const topOffset = LAYOUT_CONSTANTS.HEADER_H + 5;
+  const prompts = suggestedPrompts.length > 0 ? suggestedPrompts : STARTER_PROMPTS;
+  const showingFollowUps = suggestedPrompts.length > 0;
 
   return (
     <div style={TERMINAL_STYLES.root(bg)}>
@@ -83,7 +85,9 @@ const AppInner: React.FC = () => {
         terminalRef={terminalRef}
         topOffset={topOffset}
         isDark={isDark}
-        starterPrompts={STARTER_PROMPTS}
+        prompts={prompts}
+        promptLabel={showingFollowUps ? 'Suggested follow-up questions' : 'Suggested questions'}
+        promptPlaceholder={showingFollowUps ? 'Choose a follow-up question...' : 'Try a suggested question...'}
         promptsDisabled={isLoading || currentInput.length > 0}
         onPromptSelect={submitCommand}
       />
