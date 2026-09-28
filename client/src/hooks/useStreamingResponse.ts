@@ -352,6 +352,9 @@ const readStream = async (
       animation.clear()
       if (startedAnswer) term.writeln('')
       term.writeln(errorLine(GENERIC_ERROR))
+      // An SSE error is a terminal outcome for this response. Without marking
+      // it handled, the end-of-stream guard below prints the same error again.
+      completedAnswer = true
     }
   }
 
