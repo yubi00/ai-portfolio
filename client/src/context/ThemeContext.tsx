@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react'
+import React, { createContext, useContext, useEffect, useState } from 'react'
 
 interface ThemeContextValue {
   isDark: boolean
@@ -10,8 +10,13 @@ const ThemeContext = createContext<ThemeContextValue>({ isDark: true, toggle: ()
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isDark, setIsDark] = useState<boolean>(() => {
     const stored = localStorage.getItem('yubi_theme')
-    return stored ? stored === 'dark' : true // default: dark
+    if (stored) return stored === 'dark'
+    return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? true
   })
+
+  useEffect(() => {
+    document.documentElement.style.colorScheme = isDark ? 'dark' : 'light'
+  }, [isDark])
 
   const toggle = () =>
     setIsDark(prev => {

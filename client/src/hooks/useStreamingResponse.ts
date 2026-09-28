@@ -230,6 +230,21 @@ const readStream = async (
   let visualCol = 0
   let pendingWord = ''
 
+  const getWrapWidth = () => {
+    const configuredWidth = Math.max(20, term.cols - WRAP_RIGHT_MARGIN)
+    const element = term.element
+    const screen = element?.querySelector('.xterm-screen') as HTMLElement | null
+    const measure = element?.querySelector('.xterm-char-measure-element') as HTMLElement | null
+    const measuredTextLength = measure?.textContent?.length ?? 0
+    const measuredCharWidth = measuredTextLength > 0
+      ? (measure?.getBoundingClientRect().width ?? 0) / measuredTextLength
+      : 0
+
+    if (!screen || measuredCharWidth <= 0) return configuredWidth
+    const visibleColumns = Math.floor(screen.getBoundingClientRect().width / measuredCharWidth) - 1
+    return Math.max(20, Math.min(configuredWidth, visibleColumns))
+  }
+
   const writeHighlighted = (text: string) => {
     if (!text) return
     const { output, newState } = applyCodeHighlighting(text, hlState)
@@ -241,7 +256,7 @@ const readStream = async (
   const writeWrappedWord = (word: string) => {
     if (!word) return
 
-    const wrapWidth = Math.max(20, term.cols - WRAP_RIGHT_MARGIN)
+    const wrapWidth = getWrapWidth()
 
     if (visualCol > 0 && visualCol + word.length > wrapWidth) {
       writeHighlighted('\r\n')
@@ -277,7 +292,7 @@ const readStream = async (
         visualCol = 0
         continue
       }
-      if (visualCol < Math.max(20, term.cols - WRAP_RIGHT_MARGIN)) {
+      if (visualCol < getWrapWidth()) {
         writeHighlighted(char)
         visualCol += 1
       }

@@ -5,9 +5,19 @@ interface TerminalContainerProps {
   terminalRef: React.RefObject<HTMLDivElement>;
   topOffset: number;
   isDark: boolean;
+  starterPrompts: string[];
+  promptsDisabled: boolean;
+  onPromptSelect: (prompt: string) => boolean;
 }
 
-export const TerminalContainer: React.FC<TerminalContainerProps> = ({ terminalRef, topOffset, isDark }) => {
+export const TerminalContainer: React.FC<TerminalContainerProps> = ({
+  terminalRef,
+  topOffset,
+  isDark,
+  starterPrompts,
+  promptsDisabled,
+  onPromptSelect,
+}) => {
   const card = isDark ? DARK_CARD_STYLE : LIGHT_CARD_STYLE;
 
   return (
@@ -18,15 +28,52 @@ export const TerminalContainer: React.FC<TerminalContainerProps> = ({ terminalRe
           width: '100%',
           height: '100%',
           display: 'flex',
+          flexDirection: 'column',
           background: card.background,
           border: card.border,
           borderRadius: card.borderRadius,
           boxShadow: card.boxShadow,
         }}
       >
-        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', width: '100%' }}>
-          <div ref={terminalRef} style={{ flex: 1, minHeight: 0, width: '100%' }} />
-          <div className="terminal-bottom-spacer" />
+        <div className={`terminal-toolbar ${isDark ? 'terminal-toolbar-dark' : 'terminal-toolbar-light'}`}>
+          <div className="terminal-toolbar-label">
+            <span className="terminal-status-dot" aria-hidden="true" />
+            <span>Ask Yubi</span>
+          </div>
+          <div className="starter-prompts starter-prompts-desktop" aria-label="Suggested questions">
+            {starterPrompts.map((prompt) => (
+              <button
+                key={prompt}
+                type="button"
+                className="starter-prompt"
+                disabled={promptsDisabled}
+                onClick={() => onPromptSelect(prompt)}
+              >
+                {prompt}
+              </button>
+            ))}
+          </div>
+          <select
+            className="starter-prompt-select"
+            aria-label="Choose a suggested question"
+            defaultValue=""
+            disabled={promptsDisabled}
+            onChange={(event) => {
+              const prompt = event.currentTarget.value;
+              if (prompt && onPromptSelect(prompt)) event.currentTarget.value = '';
+            }}
+          >
+            <option value="" disabled>Try a suggested question...</option>
+            {starterPrompts.map((prompt) => (
+              <option key={prompt} value={prompt}>{prompt}</option>
+            ))}
+          </select>
+        </div>
+        <div className="terminal-content">
+          <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', width: '100%' }}>
+            <div ref={terminalRef} style={{ flex: 1, minHeight: 0, width: '100%' }} />
+            <div className="terminal-bottom-spacer" />
+          </div>
         </div>
       </div>
     </div>

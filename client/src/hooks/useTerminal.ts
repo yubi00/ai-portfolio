@@ -24,6 +24,8 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
   const [inputState, setInputState] = useState({ current: '', cursorPos: 0 });
   const [sessionId, setSessionId] = useState<string | null>(null);
   const sessionIdRef = useRef<string | null>(null);
+  const commandRunnerRef = useRef<((command: string) => Promise<void>) | null>(null);
+  const busyRef = useRef(false);
   const [isLoading, setIsLoading] = useState(false);
   const [fitAddon] = useState(() => new FitAddon());
   const [webLinksAddon] = useState(() => new WebLinksAddon());
@@ -42,26 +44,32 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
     term.loadAddon(fitAddon);
     term.loadAddon(webLinksAddon);
     term.open(terminalRef.current);
+    term.textarea?.setAttribute('aria-label', 'Ask Yubi a question');
 
     // Fit immediately, then again once fonts are ready to correct column count.
     // Guard with a flag so a late font-ready callback doesn't corrupt mid-session state.
     let fontFitDone = false;
-    requestAnimationFrame(() => { try { fitAddon.fit() } catch {} });
+    let containerFitFrame: number | undefined;
+    const fitToContainer = () => {
+      if (containerFitFrame) cancelAnimationFrame(containerFitFrame);
+      containerFitFrame = requestAnimationFrame(() => { try { fitAddon.fit() } catch {} });
+    };
+    const resizeObserver = new ResizeObserver(fitToContainer);
+    resizeObserver.observe(terminalRef.current);
+    fitToContainer();
     document.fonts?.ready.then(() => {
       if (!fontFitDone) {
         fontFitDone = true;
-        requestAnimationFrame(() => { try { fitAddon.fit() } catch {} });
+        fitToContainer();
       }
     });
 
     writeToTerminal(term, getWelcomeMessage(Boolean(options.voiceEnabled)));
     writePrompt(term);
 
-    let busy = false;
-
     const handleCommand = async (command: string) => {
       options.onCommand?.(command);
-      busy = true;
+      busyRef.current = true;
       setIsLoading(true);
       try {
         const result = await processCommand(command, sessionIdRef.current ?? sessionId ?? '');
@@ -85,24 +93,32 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
         }
       } finally {
         setIsLoading(false);
-        busy = false;
+        busyRef.current = false;
       }
       writePrompt(term);
     };
+
+    commandRunnerRef.current = handleCommand;
 
     const { handleData } = createInputHandler(
       term,
       () => inputState,
       (s) => setInputState(s),
       handleCommand,
-      () => busy,
+      () => busyRef.current,
       () => { fontFitDone = true },
     );
 
     term.onData(handleData);
     setTerminal(term);
 
-    return () => { term.dispose(); };
+    return () => {
+      resizeObserver.disconnect();
+      if (containerFitFrame) cancelAnimationFrame(containerFitFrame);
+      commandRunnerRef.current = null;
+      busyRef.current = false;
+      term.dispose();
+    };
   }, [fitAddon]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // -------------------------------------------------------------------------
@@ -167,6 +183,18 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
     clearTerminal();
   };
 
+  const submitCommand = (command: string): boolean => {
+    const trimmed = command.trim();
+    const runner = commandRunnerRef.current;
+    if (!terminal || !runner || busyRef.current || !trimmed) return false;
+
+    setInputState({ current: '', cursorPos: 0 });
+    terminal.write(trimmed);
+    terminal.write('\r\n');
+    void runner(trimmed);
+    return true;
+  };
+
   return {
     terminalRef,
     terminal,
@@ -175,5 +203,6 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
     isLoading,
     clearTerminal,
     resetSession,
+    submitCommand,
   };
 };

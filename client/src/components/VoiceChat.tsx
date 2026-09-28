@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Mic, X } from 'lucide-react';
 import { useVoiceChat, VoiceState, TranscriptTurn } from '../hooks/useVoiceChat';
 import { useTheme } from '../context/ThemeContext';
+import { LAYOUT_CONSTANTS } from '../config/terminal';
 
 interface VoiceChatProps {
     onClose: () => void;
@@ -93,7 +94,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onClose }) => {
             aria-label="Voice chat with Yubi"
             style={{
                 position: 'fixed',
-                top: 42,
+                top: LAYOUT_CONSTANTS.HEADER_H,
                 right: 0,
                 bottom: 0,
                 width: 'min(380px, 100vw)',

@@ -1,6 +1,6 @@
 export const MOBILE_BREAKPOINT = 640
-export const DESKTOP_FONT_SIZE = 14
-export const MOBILE_FONT_SIZE = 11
+export const DESKTOP_FONT_SIZE = 15
+export const MOBILE_FONT_SIZE = 13
 
 // ---------------------------------------------------------------------------
 // xterm.js themes
@@ -54,7 +54,7 @@ export const DARK_XTERM_THEME = {
 //   bg      → Solarized base3  #fdf6e3  (cream)
 export const LIGHT_XTERM_THEME = {
   background: '#fdf6e3',
-  foreground: '#657b83',   // base00 — main body text
+  foreground: '#4b6169',   // accessible body text on the cream background
   cursor: '#2aa198',   // Solarized cyan — matches accent
   selectionBackground: '#93a1a130',
 
@@ -81,11 +81,11 @@ export const LIGHT_XTERM_THEME = {
     81: '#2aa198',  // logo banner     → Solarized cyan  (same role as dark's cyan)
     114: '#859900',  // code block      → Solarized green
     152: '#2aa198',  // inline code     → Solarized cyan
-    203: '#dc322f',  // error red       → Solarized red
+    203: '#b42318',  // accessible error red
     238: '#eee8d5',  // dim separator   → base2 (very light warm)
-    244: '#93a1a1',  // muted text      → base1 (tagline)
-    248: '#657b83',  // prompt username → base00
-    250: '#586e75',  // prose text      → base01 (slightly darker, readable)
+    244: '#52666d',  // readable muted text
+    248: '#465a61',  // prompt username
+    250: '#40545b',  // prose text
   }),
 }
 
@@ -122,13 +122,14 @@ export const TERMINAL_CONFIG = {
   lineHeight: 1.3,
   letterSpacing: 0,
   scrollback: 1000,
+  screenReaderMode: true,
   theme: DARK_XTERM_THEME,
 } as const
 
 export const LAYOUT_CONSTANTS = {
   STICKY_H: 36,
   BANNER_SPACE: 124,
-  HEADER_H: 42,
+  HEADER_H: 54,
 } as const
 
 export const TERMINAL_STYLES = {
@@ -151,7 +152,7 @@ export const TERMINAL_STYLES = {
     right: 0,
     height: LAYOUT_CONSTANTS.HEADER_H,
     zIndex: 3,
-    padding: '0 14px',
+    padding: '0 12px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'flex-end',
@@ -161,9 +162,10 @@ export const TERMINAL_STYLES = {
   terminal: (topOffset: number, _isDark: boolean) => ({
     position: 'absolute' as const,
     top: topOffset,
-    left: 5,
-    right: 5,
-    bottom: 5,
+    left: '50%',
+    width: 'min(1120px, calc(100% - 24px))',
+    transform: 'translateX(-50%)',
+    bottom: 12,
     zIndex: 1,
     boxSizing: 'border-box' as const,
   }),
@@ -189,7 +191,8 @@ export const THEMES = {
 \x1b[1m\x1b[38;5;81m   ██║   ╚██████╔╝██████╔╝██║\x1b[0m
 \x1b[1m\x1b[38;5;81m   ╚═╝    ╚═════╝ ╚═════╝ ╚═╝\x1b[0m
 
-\x1b[38;5;244mTalk to Yubi - my work, projects, and experience in conversation\x1b[0m
+\x1b[38;5;244mExplore Yubi's work and projects.\x1b[0m
+\x1b[38;5;244mAsk about the experience behind them.\x1b[0m
 
 `
   }

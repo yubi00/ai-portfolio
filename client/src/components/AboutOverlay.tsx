@@ -26,8 +26,46 @@ export const AboutOverlay: React.FC<AboutOverlayProps> = ({ visible, onClose }) 
 
   useEffect(() => {
     if (!mounted || !visible) return;
-    window.setTimeout(() => cardRef.current?.focus(), 0);
-  }, [mounted, visible]);
+
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const focusCard = window.setTimeout(() => cardRef.current?.focus(), 0);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== 'Tab' || !cardRef.current) return;
+
+      const focusable = Array.from(
+        cardRef.current.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      );
+      if (focusable.length === 0) {
+        event.preventDefault();
+        cardRef.current.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', onKeyDown, true);
+    return () => {
+      window.clearTimeout(focusCard);
+      document.removeEventListener('keydown', onKeyDown, true);
+      previouslyFocused?.focus();
+    };
+  }, [mounted, visible, onClose]);
 
   if (!mounted || !visible) return null;
 
@@ -43,7 +81,7 @@ export const AboutOverlay: React.FC<AboutOverlayProps> = ({ visible, onClose }) 
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="About"
+      aria-labelledby="about-dialog-title"
       onMouseDown={onClose}
       style={{
         position: 'fixed',
@@ -62,7 +100,7 @@ export const AboutOverlay: React.FC<AboutOverlayProps> = ({ visible, onClose }) 
         onMouseDown={(e) => e.stopPropagation()}
         style={{
           width: 'min(980px, calc(100vw - 32px))',
-          maxHeight: 'min(78vh, 760px)',
+          maxHeight: 'min(86dvh, 760px)',
           borderRadius: 14,
           border,
           background: cardBg,
@@ -71,6 +109,8 @@ export const AboutOverlay: React.FC<AboutOverlayProps> = ({ visible, onClose }) 
             ? '0 18px 60px rgba(0,0,0,0.55)'
             : '0 8px 40px rgba(0,0,0,0.12)',
           overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
           color: textColor,
           fontFamily:
             'JetBrains Mono, Fira Mono, Roboto Mono, ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace',
@@ -87,31 +127,38 @@ export const AboutOverlay: React.FC<AboutOverlayProps> = ({ visible, onClose }) 
             borderBottom: `1px solid ${divider}`,
           }}
         >
-          <div style={{ fontWeight: 800, letterSpacing: 0.2 }}>About</div>
+          <div id="about-dialog-title" style={{ fontWeight: 800, letterSpacing: 0.2 }}>About</div>
           <AboutCloseButton onClose={onClose} isDark={isDark} btnBorder={btnBorder} textColor={textColor} />
         </div>
 
         {/* Body */}
         <div
+          className="about-dialog-body"
           style={{
             display: 'grid',
             gridTemplateColumns: isNarrow ? '1fr' : '320px 1fr',
             gap: 16,
             padding: 16,
             overflow: 'auto',
+            flex: '1 1 auto',
+            minHeight: 0,
           }}
         >
           <img
             src="/yubi-about-img.png"
             alt="About portrait"
             style={{
-              width: '100%',
+              width: isNarrow ? 'min(100%, 280px)' : '100%',
               height: 'auto',
+              maxHeight: isNarrow ? 260 : undefined,
               display: 'block',
               borderRadius: 12,
               border: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.06)',
               filter: isDark ? 'brightness(0.95) contrast(1.05)' : 'none',
               alignSelf: 'start',
+              justifySelf: isNarrow ? 'center' : undefined,
+              objectFit: 'cover',
+              objectPosition: 'center 32%',
             }}
           />
           <div style={{ lineHeight: 1.55, fontSize: 14 }}>
@@ -176,28 +223,19 @@ const AboutCloseButton: React.FC<{
   btnBorder: string;
   textColor: string;
 }> = ({ onClose, isDark, btnBorder, textColor }) => {
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKeyDown, { capture: true });
-    document.addEventListener('keydown', onKeyDown, { capture: true });
-    return () => {
-      window.removeEventListener('keydown', onKeyDown, { capture: true } as any);
-      document.removeEventListener('keydown', onKeyDown, { capture: true } as any);
-    };
-  }, [onClose]);
-
   return (
     <button
       type="button"
       onClick={onClose}
+      aria-label="Close About dialog"
       style={{
         background: 'transparent',
         color: textColor,
         border: `1px solid ${btnBorder}`,
         borderRadius: 10,
         padding: '6px 10px',
+        minWidth: 44,
+        minHeight: 40,
         fontFamily: 'inherit',
         fontSize: 12,
         cursor: 'pointer',
