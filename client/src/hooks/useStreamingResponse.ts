@@ -153,6 +153,7 @@ const GENERIC_ERROR = 'I had trouble generating a response. Please try again.'
 const PLAYBACK_CHUNK_CHARS = 8
 const PLAYBACK_DELAY_MS = 12
 const WRAP_RIGHT_MARGIN = 1
+const MIN_JUSTIFY_COLUMNS = 72
 
 const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -281,6 +282,9 @@ const readStream = async (
   let hlState = initialCodeHighlightState()
   let visualCol = 0
   let pendingWord = ''
+  let currentLineText = ''
+  let lineStartHighlightState = { ...hlState }
+  let justifyWrappedLines = true
 
   // FitAddon already computes xterm's safe column count from the active font
   // and container. A second DOM-based estimate can become stale during font
@@ -294,33 +298,68 @@ const readStream = async (
     term.write(output)
   }
 
+  const getJustifiedLine = (text: string, width: number): string | null => {
+    const content = text.trimEnd()
+    const isStructured = lineStartHighlightState.inCodeBlock ||
+      /^\s/.test(content) ||
+      /^(?:#{1,6}\s|[-*+]\s|\d+[.)]\s|>|```|\|)/.test(content)
+    if (isStructured) justifyWrappedLines = false
+    if (!content || width < MIN_JUSTIFY_COLUMNS || content.length >= width || !justifyWrappedLines) return null
+
+    const words = content.split(/\s+/)
+    const gapCount = words.length - 1
+    if (gapCount < 1) return null
+
+    const wordLength = words.reduce((total, word) => total + word.length, 0)
+    const spacesNeeded = width - wordLength
+    if (spacesNeeded < gapCount) return null
+
+    const spacesPerGap = Math.floor(spacesNeeded / gapCount)
+    let widerGaps = spacesNeeded % gapCount
+    return words.reduce((line, word, index) => {
+      if (index === words.length - 1) return line + word
+      const gapWidth = spacesPerGap + (widerGaps-- > 0 ? 1 : 0)
+      return line + word + ' '.repeat(gapWidth)
+    }, '')
+  }
+
+  const finishAutoWrappedLine = () => {
+    const justified = getJustifiedLine(currentLineText, getWrapWidth())
+    if (justified) {
+      const { output } = applyCodeHighlighting(justified, lineStartHighlightState)
+      term.write(`\r\x1b[2K${output}`)
+    }
+    writeHighlighted('\r\n')
+    visualCol = 0
+    currentLineText = ''
+    lineStartHighlightState = { ...hlState }
+  }
+
   const writeWrappedWord = (word: string) => {
     if (!word) return
 
     const wrapWidth = getWrapWidth()
 
     if (visualCol > 0 && visualCol + word.length > wrapWidth) {
-      writeHighlighted('\r\n')
-      visualCol = 0
+      finishAutoWrappedLine()
     }
 
     let remaining = word
     while (remaining.length > 0) {
       const available = wrapWidth - visualCol
       if (available <= 0) {
-        writeHighlighted('\r\n')
-        visualCol = 0
+        finishAutoWrappedLine()
         continue
       }
 
       const part = remaining.slice(0, available)
       writeHighlighted(part)
+      currentLineText += part
       visualCol += part.length
       remaining = remaining.slice(part.length)
 
       if (remaining.length > 0) {
-        writeHighlighted('\r\n')
-        visualCol = 0
+        finishAutoWrappedLine()
       }
     }
   }
@@ -331,10 +370,14 @@ const readStream = async (
       if (char === '\n') {
         writeHighlighted('\n')
         visualCol = 0
+        currentLineText = ''
+        lineStartHighlightState = { ...hlState }
+        justifyWrappedLines = true
         continue
       }
       if (visualCol < getWrapWidth()) {
         writeHighlighted(char)
+        currentLineText += char
         visualCol += 1
       }
     }
