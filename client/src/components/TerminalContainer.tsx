@@ -50,7 +50,6 @@ export const TerminalContainer: React.FC<TerminalContainerProps> = ({
       >
         <div className={`terminal-toolbar ${isDark ? 'terminal-toolbar-dark' : 'terminal-toolbar-light'}`}>
           <div className="terminal-toolbar-label">
-            <span className="terminal-status-dot" aria-hidden="true" />
             <span>Ask Yubi</span>
           </div>
           {retryAvailable ? (

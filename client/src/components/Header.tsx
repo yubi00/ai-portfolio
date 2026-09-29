@@ -49,6 +49,7 @@ export const Header: React.FC<HeaderProps> = ({
           <a
             className="header-action"
             href="/resume.pdf"
+            type="application/pdf"
             target="_blank"
             rel="noreferrer"
             aria-label="Open Yubi's résumé"

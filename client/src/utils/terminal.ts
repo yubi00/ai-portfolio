@@ -48,7 +48,7 @@ export const getHelpMessage = (voiceEnabled = false) => {
     ? `\r\n${B}Tip${R}\r\n  ${D}Use the mic button for voice chat.${R}`
     : ''
 
-  return `\r\n${B}Commands${R}  ${S}----------------------------${R}\r\n  ${B}help${R}    ${D}-${R} show this message\r\n  ${B}about${R}   ${D}-${R} who is Yubi\r\n  ${B}resume${R}  ${D}-${R} download resume\r\n  ${B}clear${R}   ${D}-${R} clear the terminal\r\n\r\nAsk about my work, experience, or skills.\r\n\r\n${B}Examples:${R}\r\n  ${D}"What has Yubi built?"${R}\r\n  ${D}"Tell me about Yubi's AI experience"${R}\r\n  ${D}"What projects are you most proud of?"${R}${voiceTip}\r\n\r\n`
+  return `\r\n${B}Commands${R}  ${S}----------------------------${R}\r\n  ${B}help${R}    ${D}-${R} show this message\r\n  ${B}about${R}   ${D}-${R} who is Yubi\r\n  ${B}resume${R}  ${D}-${R} open resume\r\n  ${B}clear${R}   ${D}-${R} clear the terminal\r\n\r\nAsk about my work, experience, or skills.\r\n\r\n${B}Examples:${R}\r\n  ${D}"What has Yubi built?"${R}\r\n  ${D}"Tell me about Yubi's AI experience"${R}\r\n  ${D}"What projects are you most proud of?"${R}${voiceTip}\r\n\r\n`
 }
 
 export const writeHelpMessage = (term: Terminal, voiceEnabled = false) => {

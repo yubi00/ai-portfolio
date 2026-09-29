@@ -63,14 +63,6 @@
   color: #294a52;
 }
 
-.terminal-status-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #10b981;
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.10);
-}
-
 .starter-prompts {
   display: flex;
   gap: 8px;
