@@ -282,20 +282,10 @@ const readStream = async (
   let visualCol = 0
   let pendingWord = ''
 
-  const getWrapWidth = () => {
-    const configuredWidth = Math.max(20, term.cols - WRAP_RIGHT_MARGIN)
-    const element = term.element
-    const screen = element?.querySelector('.xterm-screen') as HTMLElement | null
-    const measure = element?.querySelector('.xterm-char-measure-element') as HTMLElement | null
-    const measuredTextLength = measure?.textContent?.length ?? 0
-    const measuredCharWidth = measuredTextLength > 0
-      ? (measure?.getBoundingClientRect().width ?? 0) / measuredTextLength
-      : 0
-
-    if (!screen || measuredCharWidth <= 0) return configuredWidth
-    const visibleColumns = Math.floor(screen.getBoundingClientRect().width / measuredCharWidth) - 1
-    return Math.max(20, Math.min(configuredWidth, visibleColumns))
-  }
+  // FitAddon already computes xterm's safe column count from the active font
+  // and container. A second DOM-based estimate can become stale during font
+  // swaps or browser zoom and causes visibly premature wrapping.
+  const getWrapWidth = () => Math.max(20, term.cols - WRAP_RIGHT_MARGIN)
 
   const writeHighlighted = (text: string) => {
     if (!text) return

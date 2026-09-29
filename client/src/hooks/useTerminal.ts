@@ -51,9 +51,8 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
     term.open(terminalRef.current);
     term.textarea?.setAttribute('aria-label', 'Ask Yubi a question');
 
-    // Fit immediately, then again once fonts are ready to correct column count.
-    // Guard with a flag so a late font-ready callback doesn't corrupt mid-session state.
-    let fontFitDone = false;
+    // Fit immediately, then refit once web fonts settle so xterm's column count
+    // always matches the glyphs the visitor actually sees.
     let containerFitFrame: number | undefined;
     const fitToContainer = () => {
       if (containerFitFrame) cancelAnimationFrame(containerFitFrame);
@@ -63,10 +62,7 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
     resizeObserver.observe(terminalRef.current);
     fitToContainer();
     document.fonts?.ready.then(() => {
-      if (!fontFitDone) {
-        fontFitDone = true;
-        fitToContainer();
-      }
+      fitToContainer();
     });
 
     writeToTerminal(term, getWelcomeMessage(Boolean(options.voiceEnabled)));
@@ -81,6 +77,7 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
     const writeDisposable = term.onWriteParsed(() => syncScrollState());
 
     const handleCommand = async (command: string) => {
+      try { fitAddon.fit(); } catch {}
       const controller = new AbortController();
       abortControllerRef.current = controller;
       setSuggestedPrompts([]);
@@ -131,7 +128,6 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
       handleCommand,
       () => busyRef.current,
       () => abortControllerRef.current?.abort(),
-      () => { fontFitDone = true },
     );
 
     // Browsers may reserve Ctrl+C for copy before xterm emits terminal data.
