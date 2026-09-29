@@ -1,6 +1,5 @@
 import { Terminal } from '@xterm/xterm'
 import { getApiBaseUrl } from '../config/env'
-import { THEMES } from '../config/terminal'
 
 // Prompt style: keep it readable but low-noise. Change PROMPT_USER_COLOR to taste.
 // Good options: 245 (muted gray), 110 (soft blue), 108 (muted green), 137 (muted amber).
@@ -11,7 +10,6 @@ const PROMPT_USER_COLOR = 248
 const PROMPT = `\x1b[1m\x1b[38;5;${PROMPT_USER_COLOR}m${PROMPT_USER}\x1b[39m \x1b[38;2;147;197;253m$\x1b[0m `
 const ERROR_STYLE = '\x1b[2m\x1b[38;5;203m'
 const RESET = '\x1b[0m'
-const WELCOME_HEADER = THEMES.matrix.welcome
 
 export const writePrompt = (term: Terminal) => {
   term.write(PROMPT)
@@ -21,7 +19,7 @@ export const writePrompt = (term: Terminal) => {
 
 export const getWelcomeMessage = (voiceEnabled = false) => {
   void voiceEnabled
-  return `${WELCOME_HEADER}\x1b[2m\x1b[38;5;244mType 'help' for commands.\x1b[0m\n\n`
+  return ''
 }
 
 export const writeIntroMessage = (term: Terminal, voiceEnabled = false) => {
@@ -43,10 +41,10 @@ export const getHelpMessage = (voiceEnabled = false) => {
   const D = '\x1b[38;5;244m'
   const S = '\x1b[38;5;238m'
   const voiceTip = voiceEnabled
-    ? `\r\n${B}Tip${R}\r\n  ${D}Use the mic button above to start a voice conversation.${R}`
+    ? `\r\n${B}Tip${R}\r\n  ${D}Use the mic button for voice chat.${R}`
     : ''
 
-  return `\r\n${B}Commands${R}  ${S}----------------------------${R}\r\n  ${B}help${R}    ${D}-${R} show this message\r\n  ${B}about${R}   ${D}-${R} who is Yubi\r\n  ${B}resume${R}  ${D}-${R} download resume\r\n  ${B}clear${R}   ${D}-${R} clear the terminal\r\n\r\nAsk anything about my work, experience, or skills.\r\n\r\n${B}Examples:${R}\r\n  ${D}"What has Yubi built?"${R}\r\n  ${D}"Tell me about Yubi's AI experience"${R}\r\n  ${D}"What projects are you most proud of?"${R}${voiceTip}\r\n\r\n`
+  return `\r\n${B}Commands${R}  ${S}----------------------------${R}\r\n  ${B}help${R}    ${D}-${R} show this message\r\n  ${B}about${R}   ${D}-${R} who is Yubi\r\n  ${B}resume${R}  ${D}-${R} download resume\r\n  ${B}clear${R}   ${D}-${R} clear the terminal\r\n\r\nAsk about my work, experience, or skills.\r\n\r\n${B}Examples:${R}\r\n  ${D}"What has Yubi built?"${R}\r\n  ${D}"Tell me about Yubi's AI experience"${R}\r\n  ${D}"What projects are you most proud of?"${R}${voiceTip}\r\n\r\n`
 }
 
 export const writeHelpMessage = (term: Terminal, voiceEnabled = false) => {

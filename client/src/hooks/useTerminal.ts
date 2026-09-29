@@ -24,7 +24,11 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
   const [inputState, setInputState] = useState({ current: '', cursorPos: 0 });
   const [sessionId, setSessionId] = useState<string | null>(null);
   const sessionIdRef = useRef<string | null>(null);
+  const commandRunnerRef = useRef<((command: string) => Promise<void>) | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const busyRef = useRef(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [suggestedPrompts, setSuggestedPrompts] = useState<string[]>([]);
   const [fitAddon] = useState(() => new FitAddon());
   const [webLinksAddon] = useState(() => new WebLinksAddon());
 
@@ -42,26 +46,35 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
     term.loadAddon(fitAddon);
     term.loadAddon(webLinksAddon);
     term.open(terminalRef.current);
+    term.textarea?.setAttribute('aria-label', 'Ask Yubi a question');
 
     // Fit immediately, then again once fonts are ready to correct column count.
     // Guard with a flag so a late font-ready callback doesn't corrupt mid-session state.
     let fontFitDone = false;
-    requestAnimationFrame(() => { try { fitAddon.fit() } catch {} });
+    let containerFitFrame: number | undefined;
+    const fitToContainer = () => {
+      if (containerFitFrame) cancelAnimationFrame(containerFitFrame);
+      containerFitFrame = requestAnimationFrame(() => { try { fitAddon.fit() } catch {} });
+    };
+    const resizeObserver = new ResizeObserver(fitToContainer);
+    resizeObserver.observe(terminalRef.current);
+    fitToContainer();
     document.fonts?.ready.then(() => {
       if (!fontFitDone) {
         fontFitDone = true;
-        requestAnimationFrame(() => { try { fitAddon.fit() } catch {} });
+        fitToContainer();
       }
     });
 
     writeToTerminal(term, getWelcomeMessage(Boolean(options.voiceEnabled)));
     writePrompt(term);
 
-    let busy = false;
-
     const handleCommand = async (command: string) => {
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+      setSuggestedPrompts([]);
       options.onCommand?.(command);
-      busy = true;
+      busyRef.current = true;
       setIsLoading(true);
       try {
         const result = await processCommand(command, sessionIdRef.current ?? sessionId ?? '');
@@ -78,31 +91,63 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
               setSessionId(id);
               options.onSessionChange?.(id);
             },
-          });
+            onSuggestedPrompts: setSuggestedPrompts,
+          }, controller.signal);
         } else {
           console.error('Error processing command:', error);
           writeToTerminal(term, 'Error: Failed to process command');
         }
       } finally {
+        if (abortControllerRef.current === controller) abortControllerRef.current = null;
         setIsLoading(false);
-        busy = false;
+        busyRef.current = false;
       }
       writePrompt(term);
     };
+
+    commandRunnerRef.current = handleCommand;
 
     const { handleData } = createInputHandler(
       term,
       () => inputState,
       (s) => setInputState(s),
       handleCommand,
-      () => busy,
+      () => busyRef.current,
+      () => abortControllerRef.current?.abort(),
       () => { fontFitDone = true },
     );
+
+    // Browsers may reserve Ctrl+C for copy before xterm emits terminal data.
+    // Capture it while a response is active and the terminal owns focus.
+    const handleCancelShortcut = (event: KeyboardEvent) => {
+      if (
+        event.type === 'keydown' &&
+        event.ctrlKey &&
+        event.key.toLowerCase() === 'c' &&
+        busyRef.current &&
+        !term.hasSelection() &&
+        term.element?.contains(event.target as Node)
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        handleData('\u0003');
+      }
+    };
+    window.addEventListener('keydown', handleCancelShortcut, true);
 
     term.onData(handleData);
     setTerminal(term);
 
-    return () => { term.dispose(); };
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener('keydown', handleCancelShortcut, true);
+      if (containerFitFrame) cancelAnimationFrame(containerFitFrame);
+      abortControllerRef.current?.abort();
+      abortControllerRef.current = null;
+      commandRunnerRef.current = null;
+      busyRef.current = false;
+      term.dispose();
+    };
   }, [fitAddon]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // -------------------------------------------------------------------------
@@ -161,10 +206,23 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
 
   const resetSession = () => {
     setSessionId(null);
+    setSuggestedPrompts([]);
     sessionIdRef.current = null;
     setInputState({ current: '', cursorPos: 0 });
     options.onSessionChange?.('');
     clearTerminal();
+  };
+
+  const submitCommand = (command: string): boolean => {
+    const trimmed = command.trim();
+    const runner = commandRunnerRef.current;
+    if (!terminal || !runner || busyRef.current || !trimmed) return false;
+
+    setInputState({ current: '', cursorPos: 0 });
+    terminal.write(trimmed);
+    terminal.write('\r\n');
+    void runner(trimmed);
+    return true;
   };
 
   return {
@@ -173,7 +231,9 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
     currentInput: inputState.current,
     sessionId,
     isLoading,
+    suggestedPrompts,
     clearTerminal,
     resetSession,
+    submitCommand,
   };
 };

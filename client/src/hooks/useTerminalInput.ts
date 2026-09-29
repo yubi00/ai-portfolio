@@ -8,6 +8,7 @@ export interface InputState {
 
 export type OnSubmit = (command: string) => void
 export type IsBusy = () => boolean
+export type OnCancel = () => void
 
 /**
  * Wires up xterm keyboard input handling for a single terminal session.
@@ -30,12 +31,16 @@ export const createInputHandler = (
   setState: (s: InputState) => void,
   onSubmit: OnSubmit,
   isBusy: IsBusy,
+  onCancel?: OnCancel,
   onFirstInput?: () => void,
 ) => {
   // Local mutable state that mirrors React state for synchronous access.
   // We keep both in sync so that React renders stay consistent.
   let current = ''
   let cursorPos = 0
+  const commandHistory: string[] = []
+  let historyIndex = 0
+  let draftBeforeHistory = ''
 
   // Sync local vars into both the local refs and React state.
   const commit = (c: string, pos: number) => {
@@ -45,6 +50,13 @@ export const createInputHandler = (
   }
 
   const reset = () => commit('', 0)
+
+  const replaceCurrentInput = (next: string) => {
+    if (cursorPos > 0) term.write('\b'.repeat(cursorPos))
+    term.write('\x1b[0K')
+    term.write(next)
+    commit(next, next.length)
+  }
 
   let firstInputFired = false
   const handleData = (data: string) => {
@@ -68,8 +80,25 @@ export const createInputHandler = (
       return
     }
 
-    // Up/Down arrows — ignore
-    if (data === '\u001b[A' || data === '\u001b[B') return
+    // Up/Down arrows — navigate command history
+    if (data === '\u001b[A') {
+      if (commandHistory.length === 0 || historyIndex === 0) return
+      if (historyIndex === commandHistory.length) draftBeforeHistory = current
+      historyIndex--
+      replaceCurrentInput(commandHistory[historyIndex])
+      return
+    }
+
+    if (data === '\u001b[B') {
+      if (historyIndex >= commandHistory.length) return
+      historyIndex++
+      replaceCurrentInput(
+        historyIndex === commandHistory.length
+          ? draftBeforeHistory
+          : commandHistory[historyIndex],
+      )
+      return
+    }
 
     // Block all other escape sequences
     if (data.includes('\u001b') || data.charCodeAt(0) === 27) return
@@ -85,9 +114,15 @@ export const createInputHandler = (
           reset()
           return
         }
+        if (commandHistory[commandHistory.length - 1] !== trimmed) commandHistory.push(trimmed)
+        if (commandHistory.length > 50) commandHistory.shift()
+        historyIndex = commandHistory.length
+        draftBeforeHistory = ''
         reset()
         onSubmit(trimmed)
       } else {
+        historyIndex = commandHistory.length
+        draftBeforeHistory = ''
         reset()
         writePrompt(term)
       }
@@ -96,8 +131,15 @@ export const createInputHandler = (
 
     // Ctrl+C
     if (data === '\u0003') {
-      term.write('^C\r\n')
-      writePrompt(term)
+      if (isBusy()) {
+        onCancel?.()
+        term.write('\r\n^C\r\n')
+      } else {
+        term.write('^C\r\n')
+        writePrompt(term)
+      }
+      historyIndex = commandHistory.length
+      draftBeforeHistory = ''
       reset()
       return
     }
