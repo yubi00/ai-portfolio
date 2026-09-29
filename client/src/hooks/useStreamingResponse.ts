@@ -19,20 +19,32 @@ export interface StreamingCallbacks {
 const STATUS_COLOR = '\x1b[2m\x1b[38;5;244m'
 const STATUS_RESET = '\x1b[0m'
 const DOTS = ['   ', '.  ', '.. ', '...']
+const INITIAL_STATUS_DELAY_MS = 300
 
-const STATUS_LABELS: Record<string, string> = {
-  resolve_context: 'understanding context',
-  classify_relevance: 'understanding context',
-  check_ambiguity: 'understanding context',
-  plan_retrieval: 'understanding context',
-  retrieve_projects: 'thinking',
-  retrieve_resume: 'thinking',
-  retrieve_docs: 'thinking',
-  merge_normalize_context: 'thinking',
-  generate_answer: 'composing reply',
-  resolving_context: 'understanding context',
-  summarizing: 'composing reply',
-  friendly_chat: 'thinking',
+interface ProgressStage {
+  label: string
+  rank: number
+}
+
+const UNDERSTANDING_STAGE: ProgressStage = { label: 'understanding your question', rank: 1 }
+const REVIEWING_STAGE: ProgressStage = { label: 'reviewing relevant work', rank: 2 }
+const RESPONDING_STAGE: ProgressStage = { label: 'responding', rank: 3 }
+const COMPOSING_STAGE: ProgressStage = { label: 'composing a response', rank: 3 }
+
+const STATUS_STAGES: Record<string, ProgressStage> = {
+  resolve_context: UNDERSTANDING_STAGE,
+  classify_relevance: UNDERSTANDING_STAGE,
+  check_ambiguity: UNDERSTANDING_STAGE,
+  plan_retrieval: UNDERSTANDING_STAGE,
+  retrieve_projects: REVIEWING_STAGE,
+  retrieve_resume: REVIEWING_STAGE,
+  retrieve_docs: REVIEWING_STAGE,
+  merge_normalize_context: REVIEWING_STAGE,
+  generate_answer: COMPOSING_STAGE,
+  resolving_context: UNDERSTANDING_STAGE,
+  summarizing: COMPOSING_STAGE,
+  friendly_chat: RESPONDING_STAGE,
+  friendly_response: RESPONDING_STAGE,
 }
 
 const HIDDEN_PROGRESS_NODES = new Set([
@@ -43,25 +55,49 @@ const HIDDEN_PROGRESS_NODES = new Set([
 
 const createStatusAnimation = (term: Terminal) => {
   let dotFrame = 0
-  let currentLabel = 'thinking'
+  let currentStage: ProgressStage | null = null
   let interval: ReturnType<typeof setInterval> | null = null
+  let delayedStart: ReturnType<typeof setTimeout> | null = null
   let active = false
+  const showNotBefore = Date.now() + INITIAL_STATUS_DELAY_MS
 
-  const start = (label: string) => {
-    currentLabel = label
+  const render = () => {
+    if (!currentStage) return
+    term.write(`\r\x1b[2K${STATUS_COLOR}⟳ ${currentStage.label}${DOTS[dotFrame]}${STATUS_RESET}`)
+  }
+
+  const activate = () => {
+    delayedStart = null
     if (!active) {
       active = true
       term.write('\x1b[?25l') // hide cursor during animation
     }
+    render()
     if (!interval) {
       interval = setInterval(() => {
         dotFrame = (dotFrame + 1) % DOTS.length
-        term.write(`\r\x1b[2K${STATUS_COLOR}⟳ ${currentLabel}${DOTS[dotFrame]}${STATUS_RESET}`)
+        render()
       }, 200)
     }
   }
 
+  const advance = (stage: ProgressStage) => {
+    if (currentStage && stage.rank <= currentStage.rank) return
+    currentStage = stage
+    dotFrame = 0
+
+    if (active) {
+      render()
+      return
+    }
+
+    if (delayedStart) clearTimeout(delayedStart)
+    const remainingDelay = Math.max(0, showNotBefore - Date.now())
+    delayedStart = setTimeout(activate, remainingDelay)
+  }
+
   const clear = () => {
+    if (delayedStart) { clearTimeout(delayedStart); delayedStart = null }
     if (interval) { clearInterval(interval); interval = null }
     if (active) {
       term.write('\r\x1b[2K')  // erase status line
@@ -70,7 +106,7 @@ const createStatusAnimation = (term: Terminal) => {
     }
   }
 
-  return { start, clear }
+  return { advance, clear }
 }
 
 // ---------------------------------------------------------------------------
@@ -172,7 +208,7 @@ export const runStreamingPrompt = async (
   term.focus()
 
   const animation = createStatusAnimation(term)
-  animation.start('thinking')
+  animation.advance(UNDERSTANDING_STAGE)
   const clearOnAbort = () => animation.clear()
   signal?.addEventListener('abort', clearOnAbort, { once: true })
 
@@ -343,12 +379,14 @@ const readStream = async (
     } else if (type === 'progress' && !startedAnswer) {
       const node = String(payload?.node ?? '')
       if (!HIDDEN_PROGRESS_NODES.has(node)) {
-        animation.start(STATUS_LABELS[node] ?? STATUS_LABELS[payload?.step] ?? 'thinking')
+        const stage = STATUS_STAGES[node] ?? STATUS_STAGES[String(payload?.step ?? '')]
+        if (stage) animation.advance(stage)
       }
     } else if (type === 'status' && !startedAnswer) {
-      animation.start(STATUS_LABELS[payload?.phase] ?? 'thinking')
+      const stage = STATUS_STAGES[String(payload?.phase ?? '')]
+      if (stage) animation.advance(stage)
     } else if (type === 'classification' && !startedAnswer && payload?.relevant) {
-      animation.start('searching portfolio')
+      animation.advance(REVIEWING_STAGE)
     } else if ((type === 'answer_chunk' && typeof payload?.delta === 'string') || (type === 'partial' && typeof payload?.text === 'string')) {
       if (!startedAnswer) {
         animation.clear()
