@@ -112,9 +112,8 @@ export const LIGHT_CARD_STYLE = {
 
 export const TERMINAL_CONFIG = {
   cursorBlink: true,
-  cursorStyle: 'bar' as const,
-  cursorInactiveStyle: 'bar' as const,
-  cursorWidth: 1,
+  cursorStyle: 'underline' as const,
+  cursorInactiveStyle: 'underline' as const,
   convertEol: true,
   fontFamily:
     'JetBrains Mono, Fira Mono, Roboto Mono, ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace',
