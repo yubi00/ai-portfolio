@@ -11,10 +11,14 @@ const PROMPT = `\x1b[1m\x1b[38;5;${PROMPT_USER_COLOR}m${PROMPT_USER}\x1b[39m \x1
 const ERROR_STYLE = '\x1b[2m\x1b[38;5;203m'
 const RESET = '\x1b[0m'
 
-export const writePrompt = (term: Terminal) => {
+export const writePrompt = (
+  term: Terminal,
+  options: { scroll?: boolean; focus?: boolean } = {},
+) => {
+  const { scroll = true, focus = true } = options
   term.write(PROMPT)
-  term.scrollToBottom()
-  term.focus()
+  if (scroll) term.scrollToBottom()
+  if (focus) term.focus()
 }
 
 export const getWelcomeMessage = (voiceEnabled = false) => {
@@ -44,7 +48,7 @@ export const getHelpMessage = (voiceEnabled = false) => {
     ? `\r\n${B}Tip${R}\r\n  ${D}Use the mic button for voice chat.${R}`
     : ''
 
-  return `\r\n${B}Commands${R}  ${S}----------------------------${R}\r\n  ${B}help${R}    ${D}-${R} show this message\r\n  ${B}about${R}   ${D}-${R} who is Yubi\r\n  ${B}resume${R}  ${D}-${R} download resume\r\n  ${B}clear${R}   ${D}-${R} clear the terminal\r\n\r\nAsk about my work, experience, or skills.\r\n\r\n${B}Examples:${R}\r\n  ${D}"What has Yubi built?"${R}\r\n  ${D}"Tell me about Yubi's AI experience"${R}\r\n  ${D}"What projects are you most proud of?"${R}${voiceTip}\r\n\r\n`
+  return `\r\n${B}Commands${R}  ${S}----------------------------${R}\r\n  ${B}help${R}    ${D}-${R} show this message\r\n  ${B}about${R}   ${D}-${R} who is Yubi\r\n  ${B}resume${R}  ${D}-${R} open resume\r\n  ${B}clear${R}   ${D}-${R} clear the terminal\r\n\r\nAsk about my work, experience, or skills.\r\n\r\n${B}Examples:${R}\r\n  ${D}"What has Yubi built?"${R}\r\n  ${D}"Tell me about Yubi's AI experience"${R}\r\n  ${D}"What projects are you most proud of?"${R}${voiceTip}\r\n\r\n`
 }
 
 export const writeHelpMessage = (term: Terminal, voiceEnabled = false) => {

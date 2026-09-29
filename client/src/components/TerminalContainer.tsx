@@ -1,4 +1,5 @@
 import React from 'react';
+import { ArrowDown, RotateCcw } from 'lucide-react';
 import { TERMINAL_STYLES, DARK_CARD_STYLE, LIGHT_CARD_STYLE } from '../config/terminal';
 
 interface TerminalContainerProps {
@@ -10,6 +11,10 @@ interface TerminalContainerProps {
   promptPlaceholder: string;
   promptsDisabled: boolean;
   onPromptSelect: (prompt: string) => boolean;
+  retryAvailable: boolean;
+  onRetry: () => boolean;
+  showScrollToLatest: boolean;
+  onScrollToLatest: () => void;
 }
 
 export const TerminalContainer: React.FC<TerminalContainerProps> = ({
@@ -21,6 +26,10 @@ export const TerminalContainer: React.FC<TerminalContainerProps> = ({
   promptPlaceholder,
   promptsDisabled,
   onPromptSelect,
+  retryAvailable,
+  onRetry,
+  showScrollToLatest,
+  onScrollToLatest,
 }) => {
   const card = isDark ? DARK_CARD_STYLE : LIGHT_CARD_STYLE;
 
@@ -41,37 +50,51 @@ export const TerminalContainer: React.FC<TerminalContainerProps> = ({
       >
         <div className={`terminal-toolbar ${isDark ? 'terminal-toolbar-dark' : 'terminal-toolbar-light'}`}>
           <div className="terminal-toolbar-label">
-            <span className="terminal-status-dot" aria-hidden="true" />
             <span>Ask Yubi</span>
           </div>
-          <div className="starter-prompts starter-prompts-desktop" aria-label={promptLabel}>
-            {prompts.map((prompt) => (
-              <button
-                key={prompt}
-                type="button"
-                className="starter-prompt"
+          {retryAvailable ? (
+            <button
+              type="button"
+              className="terminal-retry-button"
+              disabled={promptsDisabled}
+              onClick={onRetry}
+              aria-label="Retry the last question"
+            >
+              <RotateCcw size={14} strokeWidth={2} aria-hidden="true" />
+              <span>Try again</span>
+            </button>
+          ) : (
+            <>
+              <div className="starter-prompts starter-prompts-desktop" aria-label={promptLabel}>
+                {prompts.map((prompt) => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    className="starter-prompt"
+                    disabled={promptsDisabled}
+                    onClick={() => onPromptSelect(prompt)}
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+              <select
+                className="starter-prompt-select"
+                aria-label={promptLabel}
+                value=""
                 disabled={promptsDisabled}
-                onClick={() => onPromptSelect(prompt)}
+                onChange={(event) => {
+                  const prompt = event.currentTarget.value;
+                  if (prompt && onPromptSelect(prompt)) event.currentTarget.value = '';
+                }}
               >
-                {prompt}
-              </button>
-            ))}
-          </div>
-          <select
-            className="starter-prompt-select"
-            aria-label={promptLabel}
-            value=""
-            disabled={promptsDisabled}
-            onChange={(event) => {
-              const prompt = event.currentTarget.value;
-              if (prompt && onPromptSelect(prompt)) event.currentTarget.value = '';
-            }}
-          >
-            <option value="" disabled>{promptPlaceholder}</option>
-            {prompts.map((prompt) => (
-              <option key={prompt} value={prompt}>{prompt}</option>
-            ))}
-          </select>
+                <option value="" disabled>{promptPlaceholder}</option>
+                {prompts.map((prompt) => (
+                  <option key={prompt} value={prompt}>{prompt}</option>
+                ))}
+              </select>
+            </>
+          )}
         </div>
         <div className="terminal-content">
           <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', width: '100%' }}>
@@ -79,6 +102,17 @@ export const TerminalContainer: React.FC<TerminalContainerProps> = ({
             <div className="terminal-bottom-spacer" />
           </div>
         </div>
+        {showScrollToLatest && (
+          <button
+            type="button"
+            className={`terminal-latest-button ${isDark ? 'terminal-latest-button-dark' : 'terminal-latest-button-light'}`}
+            onClick={onScrollToLatest}
+            aria-label="Jump to the latest response"
+          >
+            <ArrowDown size={14} strokeWidth={2} aria-hidden="true" />
+            <span>Latest</span>
+          </button>
+        )}
       </div>
     </div>
   );

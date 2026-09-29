@@ -27,8 +27,11 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
   const commandRunnerRef = useRef<((command: string) => Promise<void>) | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const busyRef = useRef(false);
+  const awayFromBottomRef = useRef(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isAwayFromBottom, setIsAwayFromBottom] = useState(false);
   const [suggestedPrompts, setSuggestedPrompts] = useState<string[]>([]);
+  const [lastFailedCommand, setLastFailedCommand] = useState<string | null>(null);
   const [fitAddon] = useState(() => new FitAddon());
   const [webLinksAddon] = useState(() => new WebLinksAddon());
 
@@ -48,9 +51,8 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
     term.open(terminalRef.current);
     term.textarea?.setAttribute('aria-label', 'Ask Yubi a question');
 
-    // Fit immediately, then again once fonts are ready to correct column count.
-    // Guard with a flag so a late font-ready callback doesn't corrupt mid-session state.
-    let fontFitDone = false;
+    // Fit immediately, then refit once web fonts settle so xterm's column count
+    // always matches the glyphs the visitor actually sees.
     let containerFitFrame: number | undefined;
     const fitToContainer = () => {
       if (containerFitFrame) cancelAnimationFrame(containerFitFrame);
@@ -60,19 +62,26 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
     resizeObserver.observe(terminalRef.current);
     fitToContainer();
     document.fonts?.ready.then(() => {
-      if (!fontFitDone) {
-        fontFitDone = true;
-        fitToContainer();
-      }
+      fitToContainer();
     });
 
     writeToTerminal(term, getWelcomeMessage(Boolean(options.voiceEnabled)));
     writePrompt(term);
 
+    const syncScrollState = (viewportY = term.buffer.active.viewportY) => {
+      const awayFromBottom = term.buffer.active.baseY - viewportY > 1;
+      awayFromBottomRef.current = awayFromBottom;
+      setIsAwayFromBottom(awayFromBottom);
+    };
+    const scrollDisposable = term.onScroll(syncScrollState);
+    const writeDisposable = term.onWriteParsed(() => syncScrollState());
+
     const handleCommand = async (command: string) => {
+      try { fitAddon.fit(); } catch {}
       const controller = new AbortController();
       abortControllerRef.current = controller;
       setSuggestedPrompts([]);
+      setLastFailedCommand(null);
       options.onCommand?.(command);
       busyRef.current = true;
       setIsLoading(true);
@@ -86,23 +95,28 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
         }
       } catch (error) {
         if (error instanceof Error && error.message === 'AI_STREAMING_NEEDED') {
-          await runStreamingPrompt(command, sessionId, sessionIdRef, term, {
+          const outcome = await runStreamingPrompt(command, sessionId, sessionIdRef, term, {
             onSessionId: (id) => {
               setSessionId(id);
               options.onSessionChange?.(id);
             },
             onSuggestedPrompts: setSuggestedPrompts,
           }, controller.signal);
+          if (outcome === 'error') setLastFailedCommand(command);
         } else {
           console.error('Error processing command:', error);
           writeToTerminal(term, 'Error: Failed to process command');
+          setLastFailedCommand(command);
         }
       } finally {
         if (abortControllerRef.current === controller) abortControllerRef.current = null;
         setIsLoading(false);
         busyRef.current = false;
       }
-      writePrompt(term);
+      writePrompt(term, {
+        scroll: !awayFromBottomRef.current,
+        focus: !awayFromBottomRef.current,
+      });
     };
 
     commandRunnerRef.current = handleCommand;
@@ -114,7 +128,6 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
       handleCommand,
       () => busyRef.current,
       () => abortControllerRef.current?.abort(),
-      () => { fontFitDone = true },
     );
 
     // Browsers may reserve Ctrl+C for copy before xterm emits terminal data.
@@ -140,6 +153,8 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
 
     return () => {
       resizeObserver.disconnect();
+      scrollDisposable.dispose();
+      writeDisposable.dispose();
       window.removeEventListener('keydown', handleCancelShortcut, true);
       if (containerFitFrame) cancelAnimationFrame(containerFitFrame);
       abortControllerRef.current?.abort();
@@ -200,6 +215,8 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
   const clearTerminal = () => {
     if (!terminal) return;
     terminal.clear();
+    awayFromBottomRef.current = false;
+    setIsAwayFromBottom(false);
     writeToTerminal(terminal, getWelcomeMessage(Boolean(options.voiceEnabled)));
     writePrompt(terminal);
   };
@@ -207,6 +224,7 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
   const resetSession = () => {
     setSessionId(null);
     setSuggestedPrompts([]);
+    setLastFailedCommand(null);
     sessionIdRef.current = null;
     setInputState({ current: '', cursorPos: 0 });
     options.onSessionChange?.('');
@@ -218,11 +236,27 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
     const runner = commandRunnerRef.current;
     if (!terminal || !runner || busyRef.current || !trimmed) return false;
 
+    terminal.scrollToBottom();
+    awayFromBottomRef.current = false;
+    setIsAwayFromBottom(false);
     setInputState({ current: '', cursorPos: 0 });
     terminal.write(trimmed);
     terminal.write('\r\n');
     void runner(trimmed);
     return true;
+  };
+
+  const scrollToLatest = () => {
+    if (!terminal) return;
+    terminal.scrollToBottom();
+    terminal.focus();
+    awayFromBottomRef.current = false;
+    setIsAwayFromBottom(false);
+  };
+
+  const retryLastCommand = (): boolean => {
+    if (!lastFailedCommand) return false;
+    return submitCommand(lastFailedCommand);
   };
 
   return {
@@ -232,8 +266,12 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
     sessionId,
     isLoading,
     suggestedPrompts,
+    retryAvailable: Boolean(lastFailedCommand),
+    isAwayFromBottom,
     clearTerminal,
     resetSession,
+    scrollToLatest,
+    retryLastCommand,
     submitCommand,
   };
 };

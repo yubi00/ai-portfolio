@@ -63,7 +63,7 @@ export class ResumeCommandHandler extends BaseCommandHandler {
     const link = `\x1b]8;;${url}\x1b\\${url}\x1b]8;;\x1b\\`
 
     return {
-      output: `\r\n\x1b[1mResume\x1b[0m \x1b[38;5;244m- Yubi Khadka\x1b[0m\r\n\r\n  Download: \x1b[38;2;147;197;253m${link}\x1b[0m\r\n\r\n`,
+      output: `\r\n\x1b[1mResume\x1b[0m \x1b[38;5;244m- Yubi Khadka\x1b[0m\r\n\r\n  Open: \x1b[38;2;147;197;253m${link}\x1b[0m\r\n\r\n`,
       sessionId,
     }
   }

@@ -25,7 +25,18 @@ const AppInner: React.FC = () => {
   const [aboutVisible, setAboutVisible] = useState(false);
   const [voiceOpen, setVoiceOpen] = useState(false);
 
-  const { terminalRef, terminal, currentInput, isLoading, suggestedPrompts, submitCommand } = useTerminal({
+  const {
+    terminalRef,
+    terminal,
+    currentInput,
+    isLoading,
+    suggestedPrompts,
+    retryAvailable,
+    isAwayFromBottom,
+    retryLastCommand,
+    scrollToLatest,
+    submitCommand,
+  } = useTerminal({
     voiceEnabled: VOICE_ENABLED,
     onCommand: (command) => {
       const trimmed = command.trim().toLowerCase();
@@ -90,6 +101,10 @@ const AppInner: React.FC = () => {
         promptPlaceholder={showingFollowUps ? 'Choose a follow-up question...' : 'Try a suggested question...'}
         promptsDisabled={isLoading || currentInput.length > 0}
         onPromptSelect={submitCommand}
+        retryAvailable={retryAvailable}
+        onRetry={retryLastCommand}
+        showScrollToLatest={isAwayFromBottom}
+        onScrollToLatest={scrollToLatest}
       />
       {VOICE_ENABLED && voiceOpen && <VoiceChat onClose={() => setVoiceOpen(false)} />}
     </div>

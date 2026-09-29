@@ -22,8 +22,6 @@ export type OnCancel = () => void
  * - Enter submission (delegates to `onSubmit`)
  * - Blocks all other escape sequences
  *
- * `onFirstInput` is called on the first keystroke — used by the caller to
- * prevent any pending late font-load fit from firing mid-session.
  */
 export const createInputHandler = (
   term: Terminal,
@@ -32,7 +30,6 @@ export const createInputHandler = (
   onSubmit: OnSubmit,
   isBusy: IsBusy,
   onCancel?: OnCancel,
-  onFirstInput?: () => void,
 ) => {
   // Local mutable state that mirrors React state for synchronous access.
   // We keep both in sync so that React renders stay consistent.
@@ -58,10 +55,7 @@ export const createInputHandler = (
     commit(next, next.length)
   }
 
-  let firstInputFired = false
   const handleData = (data: string) => {
-    if (!firstInputFired) { firstInputFired = true; onFirstInput?.() }
-
     // Left arrow
     if (data === '\u001b[D') {
       if (cursorPos > 0) {
