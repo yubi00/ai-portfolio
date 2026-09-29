@@ -12,6 +12,8 @@ export interface StreamingCallbacks {
   onSuggestedPrompts?: (prompts: string[]) => void
 }
 
+export type StreamingOutcome = 'completed' | 'error' | 'aborted'
+
 // ---------------------------------------------------------------------------
 // Status animation
 // ---------------------------------------------------------------------------
@@ -202,7 +204,7 @@ export const runStreamingPrompt = async (
   term: Terminal,
   callbacks: StreamingCallbacks,
   signal?: AbortSignal,
-): Promise<void> => {
+): Promise<StreamingOutcome> => {
   term.writeln('')
   term.scrollToBottom()
   term.focus()
@@ -238,19 +240,21 @@ export const runStreamingPrompt = async (
     if (!res.ok) {
       animation.clear()
       term.writeln(errorLine(await parseApiError(res)))
-      return
+      return 'error'
     }
 
     if (!res.body) {
       animation.clear()
       term.writeln(errorLine(GENERIC_ERROR))
-      return
+      return 'error'
     }
 
-    await readStream(res, term, animation, callbacks, sessionIdRef, signal)
+    return await readStream(res, term, animation, callbacks, sessionIdRef, signal)
   } catch (error) {
     animation.clear()
-    if (!isAbortError(error)) term.writeln(errorLine(sanitizeThrownError(error)))
+    if (isAbortError(error)) return 'aborted'
+    term.writeln(errorLine(sanitizeThrownError(error)))
+    return 'error'
   } finally {
     signal?.removeEventListener('abort', clearOnAbort)
   }
@@ -267,12 +271,13 @@ const readStream = async (
   callbacks: StreamingCallbacks,
   sessionIdRef: React.MutableRefObject<string | null>,
   signal?: AbortSignal,
-): Promise<void> => {
+): Promise<StreamingOutcome> => {
   const reader = res.body!.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
   let startedAnswer = false
   let completedAnswer = false
+  let failedAnswer = false
   let hlState = initialCodeHighlightState()
   let visualCol = 0
   let pendingWord = ''
@@ -415,6 +420,7 @@ const readStream = async (
       // An SSE error is a terminal outcome for this response. Without marking
       // it handled, the end-of-stream guard below prints the same error again.
       completedAnswer = true
+      failedAnswer = true
     }
   }
 
@@ -436,6 +442,13 @@ const readStream = async (
 
   if (!completedAnswer) {
     animation.clear()
-    if (!startedAnswer) term.writeln(errorLine(GENERIC_ERROR))
+    if (startedAnswer) {
+      flushPendingWord()
+      term.writeln('')
+    }
+    term.writeln(errorLine(GENERIC_ERROR))
+    return 'error'
   }
+
+  return failedAnswer ? 'error' : 'completed'
 }

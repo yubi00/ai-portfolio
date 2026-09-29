@@ -31,6 +31,7 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isAwayFromBottom, setIsAwayFromBottom] = useState(false);
   const [suggestedPrompts, setSuggestedPrompts] = useState<string[]>([]);
+  const [lastFailedCommand, setLastFailedCommand] = useState<string | null>(null);
   const [fitAddon] = useState(() => new FitAddon());
   const [webLinksAddon] = useState(() => new WebLinksAddon());
 
@@ -83,6 +84,7 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
       const controller = new AbortController();
       abortControllerRef.current = controller;
       setSuggestedPrompts([]);
+      setLastFailedCommand(null);
       options.onCommand?.(command);
       busyRef.current = true;
       setIsLoading(true);
@@ -96,16 +98,18 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
         }
       } catch (error) {
         if (error instanceof Error && error.message === 'AI_STREAMING_NEEDED') {
-          await runStreamingPrompt(command, sessionId, sessionIdRef, term, {
+          const outcome = await runStreamingPrompt(command, sessionId, sessionIdRef, term, {
             onSessionId: (id) => {
               setSessionId(id);
               options.onSessionChange?.(id);
             },
             onSuggestedPrompts: setSuggestedPrompts,
           }, controller.signal);
+          if (outcome === 'error') setLastFailedCommand(command);
         } else {
           console.error('Error processing command:', error);
           writeToTerminal(term, 'Error: Failed to process command');
+          setLastFailedCommand(command);
         }
       } finally {
         if (abortControllerRef.current === controller) abortControllerRef.current = null;
@@ -224,6 +228,7 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
   const resetSession = () => {
     setSessionId(null);
     setSuggestedPrompts([]);
+    setLastFailedCommand(null);
     sessionIdRef.current = null;
     setInputState({ current: '', cursorPos: 0 });
     options.onSessionChange?.('');
@@ -253,6 +258,11 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
     setIsAwayFromBottom(false);
   };
 
+  const retryLastCommand = (): boolean => {
+    if (!lastFailedCommand) return false;
+    return submitCommand(lastFailedCommand);
+  };
+
   return {
     terminalRef,
     terminal,
@@ -260,10 +270,12 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
     sessionId,
     isLoading,
     suggestedPrompts,
+    retryAvailable: Boolean(lastFailedCommand),
     isAwayFromBottom,
     clearTerminal,
     resetSession,
     scrollToLatest,
+    retryLastCommand,
     submitCommand,
   };
 };

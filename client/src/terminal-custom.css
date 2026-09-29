@@ -87,6 +87,47 @@
   display: none;
 }
 
+.terminal-retry-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 32px;
+  padding: 6px 12px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font-family: 'JetBrains Mono','Fira Mono','Roboto Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.terminal-retry-button:hover,
+.terminal-retry-button:focus-visible {
+  opacity: 1;
+}
+
+.terminal-toolbar-dark .terminal-retry-button:hover,
+.terminal-toolbar-dark .terminal-retry-button:focus-visible {
+  color: #fecaca;
+  border-color: rgba(248, 113, 113, 0.45);
+  background: rgba(248, 113, 113, 0.08);
+}
+
+.terminal-toolbar-light .terminal-retry-button:hover,
+.terminal-toolbar-light .terminal-retry-button:focus-visible {
+  color: #991b1b;
+  border-color: rgba(185, 28, 28, 0.35);
+  background: rgba(185, 28, 28, 0.06);
+}
+
+.terminal-retry-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
 .starter-prompt {
   min-height: 32px;
   padding: 6px 10px;
@@ -383,6 +424,11 @@ a:focus-visible {
 
   .terminal-toolbar-label {
     font-size: 13px;
+  }
+
+  .terminal-retry-button {
+    width: 100%;
+    min-height: 44px;
   }
 
   .terminal-latest-button {

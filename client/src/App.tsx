@@ -31,7 +31,9 @@ const AppInner: React.FC = () => {
     currentInput,
     isLoading,
     suggestedPrompts,
+    retryAvailable,
     isAwayFromBottom,
+    retryLastCommand,
     scrollToLatest,
     submitCommand,
   } = useTerminal({
@@ -99,6 +101,8 @@ const AppInner: React.FC = () => {
         promptPlaceholder={showingFollowUps ? 'Choose a follow-up question...' : 'Try a suggested question...'}
         promptsDisabled={isLoading || currentInput.length > 0}
         onPromptSelect={submitCommand}
+        retryAvailable={retryAvailable}
+        onRetry={retryLastCommand}
         showScrollToLatest={isAwayFromBottom}
         onScrollToLatest={scrollToLatest}
       />
