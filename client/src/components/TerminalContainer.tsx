@@ -1,4 +1,5 @@
 import React from 'react';
+import { ArrowDown } from 'lucide-react';
 import { TERMINAL_STYLES, DARK_CARD_STYLE, LIGHT_CARD_STYLE } from '../config/terminal';
 
 interface TerminalContainerProps {
@@ -10,6 +11,8 @@ interface TerminalContainerProps {
   promptPlaceholder: string;
   promptsDisabled: boolean;
   onPromptSelect: (prompt: string) => boolean;
+  showScrollToLatest: boolean;
+  onScrollToLatest: () => void;
 }
 
 export const TerminalContainer: React.FC<TerminalContainerProps> = ({
@@ -21,6 +24,8 @@ export const TerminalContainer: React.FC<TerminalContainerProps> = ({
   promptPlaceholder,
   promptsDisabled,
   onPromptSelect,
+  showScrollToLatest,
+  onScrollToLatest,
 }) => {
   const card = isDark ? DARK_CARD_STYLE : LIGHT_CARD_STYLE;
 
@@ -79,6 +84,17 @@ export const TerminalContainer: React.FC<TerminalContainerProps> = ({
             <div className="terminal-bottom-spacer" />
           </div>
         </div>
+        {showScrollToLatest && (
+          <button
+            type="button"
+            className={`terminal-latest-button ${isDark ? 'terminal-latest-button-dark' : 'terminal-latest-button-light'}`}
+            onClick={onScrollToLatest}
+            aria-label="Jump to the latest response"
+          >
+            <ArrowDown size={14} strokeWidth={2} aria-hidden="true" />
+            <span>Latest</span>
+          </button>
+        )}
       </div>
     </div>
   );

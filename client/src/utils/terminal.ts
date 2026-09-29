@@ -11,10 +11,14 @@ const PROMPT = `\x1b[1m\x1b[38;5;${PROMPT_USER_COLOR}m${PROMPT_USER}\x1b[39m \x1
 const ERROR_STYLE = '\x1b[2m\x1b[38;5;203m'
 const RESET = '\x1b[0m'
 
-export const writePrompt = (term: Terminal) => {
+export const writePrompt = (
+  term: Terminal,
+  options: { scroll?: boolean; focus?: boolean } = {},
+) => {
+  const { scroll = true, focus = true } = options
   term.write(PROMPT)
-  term.scrollToBottom()
-  term.focus()
+  if (scroll) term.scrollToBottom()
+  if (focus) term.focus()
 }
 
 export const getWelcomeMessage = (voiceEnabled = false) => {

@@ -27,7 +27,9 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
   const commandRunnerRef = useRef<((command: string) => Promise<void>) | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const busyRef = useRef(false);
+  const awayFromBottomRef = useRef(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isAwayFromBottom, setIsAwayFromBottom] = useState(false);
   const [suggestedPrompts, setSuggestedPrompts] = useState<string[]>([]);
   const [fitAddon] = useState(() => new FitAddon());
   const [webLinksAddon] = useState(() => new WebLinksAddon());
@@ -69,6 +71,14 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
     writeToTerminal(term, getWelcomeMessage(Boolean(options.voiceEnabled)));
     writePrompt(term);
 
+    const syncScrollState = (viewportY = term.buffer.active.viewportY) => {
+      const awayFromBottom = term.buffer.active.baseY - viewportY > 1;
+      awayFromBottomRef.current = awayFromBottom;
+      setIsAwayFromBottom(awayFromBottom);
+    };
+    const scrollDisposable = term.onScroll(syncScrollState);
+    const writeDisposable = term.onWriteParsed(() => syncScrollState());
+
     const handleCommand = async (command: string) => {
       const controller = new AbortController();
       abortControllerRef.current = controller;
@@ -102,7 +112,10 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
         setIsLoading(false);
         busyRef.current = false;
       }
-      writePrompt(term);
+      writePrompt(term, {
+        scroll: !awayFromBottomRef.current,
+        focus: !awayFromBottomRef.current,
+      });
     };
 
     commandRunnerRef.current = handleCommand;
@@ -140,6 +153,8 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
 
     return () => {
       resizeObserver.disconnect();
+      scrollDisposable.dispose();
+      writeDisposable.dispose();
       window.removeEventListener('keydown', handleCancelShortcut, true);
       if (containerFitFrame) cancelAnimationFrame(containerFitFrame);
       abortControllerRef.current?.abort();
@@ -200,6 +215,8 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
   const clearTerminal = () => {
     if (!terminal) return;
     terminal.clear();
+    awayFromBottomRef.current = false;
+    setIsAwayFromBottom(false);
     writeToTerminal(terminal, getWelcomeMessage(Boolean(options.voiceEnabled)));
     writePrompt(terminal);
   };
@@ -218,11 +235,22 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
     const runner = commandRunnerRef.current;
     if (!terminal || !runner || busyRef.current || !trimmed) return false;
 
+    terminal.scrollToBottom();
+    awayFromBottomRef.current = false;
+    setIsAwayFromBottom(false);
     setInputState({ current: '', cursorPos: 0 });
     terminal.write(trimmed);
     terminal.write('\r\n');
     void runner(trimmed);
     return true;
+  };
+
+  const scrollToLatest = () => {
+    if (!terminal) return;
+    terminal.scrollToBottom();
+    terminal.focus();
+    awayFromBottomRef.current = false;
+    setIsAwayFromBottom(false);
   };
 
   return {
@@ -232,8 +260,10 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
     sessionId,
     isLoading,
     suggestedPrompts,
+    isAwayFromBottom,
     clearTerminal,
     resetSession,
+    scrollToLatest,
     submitCommand,
   };
 };

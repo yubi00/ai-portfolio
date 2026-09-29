@@ -297,7 +297,6 @@ const readStream = async (
     const { output, newState } = applyCodeHighlighting(text, hlState)
     hlState = newState
     term.write(output)
-    term.scrollToBottom()
   }
 
   const writeWrappedWord = (word: string) => {

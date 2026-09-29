@@ -147,6 +147,47 @@ a:focus-visible {
   width: 100%;
 }
 
+.terminal-latest-button {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-family: 'JetBrains Mono','Fira Mono','Roboto Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+}
+
+.terminal-latest-button-dark {
+  color: #dbeafe;
+  border-color: rgba(147, 197, 253, 0.28);
+  background: #1a1a21;
+}
+
+.terminal-latest-button-light {
+  color: #164e63;
+  border-color: rgba(15, 118, 110, 0.24);
+  background: #fffaf0;
+}
+
+.terminal-latest-button:hover {
+  transform: translateY(-1px);
+}
+
+.terminal-latest-button:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+}
+
 .app-header-inner {
   display: flex;
   align-items: center;
@@ -342,6 +383,13 @@ a:focus-visible {
 
   .terminal-toolbar-label {
     font-size: 13px;
+  }
+
+  .terminal-latest-button {
+    right: 12px;
+    bottom: 12px;
+    min-height: 44px;
+    padding: 0 14px;
   }
 
   .header-action,
