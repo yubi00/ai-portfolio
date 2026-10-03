@@ -422,8 +422,13 @@ const readStream = async (
     } else if (type === 'status' && !startedAnswer) {
       const stage = STATUS_STAGES[String(payload?.phase ?? '')]
       if (stage) animation.advance(stage)
-    } else if (type === 'classification' && !startedAnswer && payload?.relevant) {
-      animation.advance(REVIEWING_STAGE)
+    } else if (type === 'classification' && !startedAnswer && payload?.relevant === false) {
+      // Legacy APIs may emit a classification event before their route is
+      // known. A positive classification does not prove retrieval happened;
+      // explicit retrieve_* progress events are the source of truth for the
+      // reviewing stage. A negative classification can safely move straight
+      // to the conversational response stage.
+      animation.advance(RESPONDING_STAGE)
     } else if ((type === 'answer_chunk' && typeof payload?.delta === 'string') || (type === 'partial' && typeof payload?.text === 'string')) {
       if (!startedAnswer) {
         animation.clear()
